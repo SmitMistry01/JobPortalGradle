@@ -1,0 +1,85 @@
+package com.jobportal.jobservice.controller;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jobportal.jobservice.dto.CreateJobRequest;
+import com.jobportal.jobservice.model.Job;
+import com.jobportal.jobservice.service.JobService;
+import java.math.BigDecimal;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest(JobController.class)
+@AutoConfigureMockMvc(addFilters = false)
+class JobControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @MockBean
+    private JobService jobService;
+
+    @Test
+    void createJob_shouldReturnForbidden_forNonRecruiter() throws Exception {
+        CreateJobRequest request = new CreateJobRequest();
+        request.setTitle("Java Developer");
+
+        mockMvc.perform(post("/api/jobs")
+                        .header("X-User-Role", "JOB_SEEKER")
+                        .header("X-User-Id", "10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void createJob_shouldCreate_forRecruiter() throws Exception {
+        CreateJobRequest request = new CreateJobRequest();
+        request.setTitle("Java Developer");
+        request.setCompanyName("ABC");
+        request.setLocation("Pune");
+        request.setSalary(BigDecimal.valueOf(1000000));
+
+        Job job = new Job();
+        job.setId(1L);
+        job.setTitle("Java Developer");
+        job.setRecruiterId(5L);
+
+        Mockito.when(jobService.createJob(Mockito.any(CreateJobRequest.class), Mockito.eq(5L))).thenReturn(job);
+
+        mockMvc.perform(post("/api/jobs")
+                        .header("X-User-Role", "RECRUITER")
+                        .header("X-User-Id", "5")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.recruiterId").value(5));
+    }
+
+    @Test
+    void allJobs_shouldReturnList() throws Exception {
+        Job job = new Job();
+        job.setId(2L);
+        job.setTitle("Backend Engineer");
+        Mockito.when(jobService.getAllJobs()).thenReturn(List.of(job));
+
+        mockMvc.perform(get("/api/jobs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(2));
+    }
+}

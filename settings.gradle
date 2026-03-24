@@ -1,0 +1,10 @@
+rootProject.name = 'jobs-portal-backend'
+
+include 'config-server'
+include 'discovery-server'
+include 'api-gateway'
+include 'auth-service'
+include 'job-service'
+include 'application-service'
+include 'admin-service'
+include 'notification-service'
