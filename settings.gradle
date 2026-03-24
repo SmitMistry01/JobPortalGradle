@@ -1,10 +1,14 @@
+pluginManagement { repositories { gradlePluginPortal(); mavenCentral() } }
+
 rootProject.name = 'jobs-portal-backend'
 
-include 'config-server'
-include 'discovery-server'
-include 'api-gateway'
-include 'auth-service'
-include 'job-service'
-include 'application-service'
-include 'admin-service'
-include 'notification-service'
+include(
+    'services:auth-service',
+    'services:job-service',
+    'services:admin-service',
+    'services:application-service',
+    'services:notification-service',
+    'services:discovery-server',
+    'services:config-server',
+    'services:api-gateway'
+)

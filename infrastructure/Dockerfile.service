@@ -1,0 +1,20 @@
+FROM eclipse-temurin:21-jdk AS builder
+WORKDIR /workspace
+
+COPY gradlew gradlew.bat settings.gradle build.gradle gradle.properties ./
+COPY gradle gradle
+COPY services services
+
+RUN chmod +x gradlew
+
+ARG SERVICE_MODULE
+RUN ./gradlew --no-daemon :services:${SERVICE_MODULE}:bootJar -x test
+
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+
+ARG SERVICE_MODULE
+COPY --from=builder /workspace/services/${SERVICE_MODULE}/build/libs/*.jar app.jar
+
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

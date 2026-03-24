@@ -1,0 +1,188 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: smit
+      MYSQL_DATABASE: auth_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./infrastructure/mysql-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-psmit"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  config-server:
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.service
+      args:
+        SERVICE_MODULE: config-server
+    container_name: config-server
+    ports:
+      - "8888:8888"
+
+  discovery-server:
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.service
+      args:
+        SERVICE_MODULE: discovery-server
+    container_name: discovery-server
+    ports:
+      - "8761:8761"
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+    depends_on:
+      - config-server
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.service
+      args:
+        SERVICE_MODULE: auth-service
+    container_name: auth-service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: auth-service
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/auth_db
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: smit
+      SECURITY_JWT_SECRET: my-super-secret-jwt-key-my-super-secret-jwt-key
+    depends_on:
+      - config-server
+      - discovery-server
+      - mysql
+
+  job-service:
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.service
+      args:
+        SERVICE_MODULE: job-service
+    container_name: job-service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: job-service
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/job_db
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: smit
+      SPRING_RABBITMQ_HOST: rabbitmq
+    depends_on:
+      - config-server
+      - discovery-server
+      - mysql
+      - rabbitmq
+
+  application-service:
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.service
+      args:
+        SERVICE_MODULE: application-service
+    container_name: application-service
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: application-service
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/user_db
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: smit
+      SPRING_RABBITMQ_HOST: rabbitmq
+    depends_on:
+      - config-server
+      - discovery-server
+      - mysql
+      - rabbitmq
+
+  admin-service:
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.service
+      args:
+        SERVICE_MODULE: admin-service
+    container_name: admin-service
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: admin-service
+    depends_on:
+      - config-server
+      - discovery-server
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.service
+      args:
+        SERVICE_MODULE: notification-service
+    container_name: notification-service
+    ports:
+      - "8085:8085"
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: notification-service
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_MAIL_HOST: smtp.gmail.com
+      SPRING_MAIL_PORT: 587
+      SPRING_MAIL_USERNAME: jobportall121@gmail.com
+      SPRING_MAIL_PASSWORD: tyrwqxhcmvwaxjjq
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
+    depends_on:
+      - config-server
+      - discovery-server
+      - rabbitmq
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.service
+      args:
+        SERVICE_MODULE: api-gateway
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: api-gateway
+      SECURITY_JWT_SECRET: my-super-secret-jwt-key-my-super-secret-jwt-key
+    depends_on:
+      - config-server
+      - discovery-server
+      - auth-service
+      - job-service
+      - application-service
+      - admin-service
+
+volumes:
+  mysql_data:
