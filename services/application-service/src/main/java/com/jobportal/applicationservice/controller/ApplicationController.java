@@ -23,7 +23,7 @@ public class ApplicationController {
                                                 @RequestHeader("X-User-Id") Long userId,
                                                 @RequestHeader("X-User-Email") String userEmail,
                                                 @RequestHeader("X-User-Role") String role) {
-        if (!"JOB_SEEKER".equalsIgnoreCase(role)) {
+        if (!hasRole(role, "JOB_SEEKER")) {
             return ResponseEntity.status(403).build();
         }
         return ResponseEntity.ok(service.apply(request, userId, userEmail));
@@ -37,7 +37,7 @@ public class ApplicationController {
     @GetMapping("/job/{jobId}")
     public ResponseEntity<List<JobApplication>> jobApplications(@PathVariable Long jobId,
                                                                 @RequestHeader("X-User-Role") String role) {
-        if (!"RECRUITER".equalsIgnoreCase(role) && !"ADMIN".equalsIgnoreCase(role)) {
+        if (!hasAnyRole(role, "RECRUITER", "ADMIN")) {
             return ResponseEntity.status(403).build();
         }
         return ResponseEntity.ok(service.jobApplications(jobId));
@@ -47,9 +47,29 @@ public class ApplicationController {
     public ResponseEntity<JobApplication> updateStatus(@PathVariable Long id,
                                                        @RequestParam ApplicationStatus status,
                                                        @RequestHeader("X-User-Role") String role) {
-        if (!"RECRUITER".equalsIgnoreCase(role)) {
+        if (!hasRole(role, "RECRUITER")) {
             return ResponseEntity.status(403).build();
         }
         return ResponseEntity.ok(service.updateStatus(id, status));
+    }
+
+    private boolean hasAnyRole(String actualRole, String... expectedRoles) {
+        for (String expectedRole : expectedRoles) {
+            if (hasRole(actualRole, expectedRole)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasRole(String actualRole, String expectedRole) {
+        if (actualRole == null || actualRole.isBlank()) {
+            return false;
+        }
+        String normalized = actualRole.trim();
+        if (normalized.regionMatches(true, 0, "ROLE_", 0, 5)) {
+            normalized = normalized.substring(5);
+        }
+        return expectedRole.equalsIgnoreCase(normalized);
     }
 }

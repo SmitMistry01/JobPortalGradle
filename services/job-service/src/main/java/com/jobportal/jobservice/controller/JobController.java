@@ -21,10 +21,21 @@ public class JobController {
     public ResponseEntity<Job> createJob(@RequestBody CreateJobRequest request,
                                          @RequestHeader("X-User-Role") String role,
                                          @RequestHeader("X-User-Id") Long userId) {
-        if (!"RECRUITER".equalsIgnoreCase(role)) {
+        if (!hasRole(role, "RECRUITER")) {
             return ResponseEntity.status(403).build();
         }
         return ResponseEntity.ok(jobService.createJob(request, userId));
+    }
+
+    private boolean hasRole(String actualRole, String expectedRole) {
+        if (actualRole == null || actualRole.isBlank()) {
+            return false;
+        }
+        String normalized = actualRole.trim();
+        if (normalized.regionMatches(true, 0, "ROLE_", 0, 5)) {
+            normalized = normalized.substring(5);
+        }
+        return expectedRole.equalsIgnoreCase(normalized);
     }
 
     @GetMapping

@@ -73,6 +73,31 @@ class ApplicationControllerTest {
     }
 
     @Test
+    void apply_shouldCreateApplication_forRolePrefixedJobSeeker() throws Exception {
+        ApplyJobRequest request = new ApplyJobRequest();
+        request.setJobId(1L);
+        request.setResumeUrl("http://example.com/resume.pdf");
+
+        JobApplication application = new JobApplication();
+        application.setId(12L);
+        application.setJobId(1L);
+        application.setUserId(11L);
+        application.setStatus(ApplicationStatus.APPLIED);
+
+        Mockito.when(service.apply(Mockito.any(ApplyJobRequest.class), Mockito.eq(11L), Mockito.eq("user@example.com")))
+                .thenReturn(application);
+
+        mockMvc.perform(post("/api/applications")
+                        .header("X-User-Id", "11")
+                        .header("X-User-Email", "user@example.com")
+                        .header("X-User-Role", "ROLE_JOB_SEEKER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(12));
+    }
+
+    @Test
     void updateStatus_shouldUpdate_forRecruiter() throws Exception {
         JobApplication updated = new JobApplication();
         updated.setId(10L);
@@ -82,6 +107,21 @@ class ApplicationControllerTest {
 
         mockMvc.perform(put("/api/applications/10/status")
                         .header("X-User-Role", "RECRUITER")
+                        .param("status", "SELECTED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SELECTED"));
+    }
+
+    @Test
+    void updateStatus_shouldUpdate_forRolePrefixedRecruiter() throws Exception {
+        JobApplication updated = new JobApplication();
+        updated.setId(10L);
+        updated.setStatus(ApplicationStatus.SELECTED);
+
+        Mockito.when(service.updateStatus(10L, ApplicationStatus.SELECTED)).thenReturn(updated);
+
+        mockMvc.perform(put("/api/applications/10/status")
+                        .header("X-User-Role", "ROLE_RECRUITER")
                         .param("status", "SELECTED"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SELECTED"));

@@ -72,6 +72,31 @@ class JobControllerTest {
     }
 
     @Test
+    void createJob_shouldCreate_forRolePrefixedRecruiter() throws Exception {
+        CreateJobRequest request = new CreateJobRequest();
+        request.setTitle("Java Developer");
+        request.setCompanyName("ABC");
+        request.setLocation("Pune");
+        request.setSalary(BigDecimal.valueOf(1000000));
+
+        Job job = new Job();
+        job.setId(3L);
+        job.setTitle("Java Developer");
+        job.setRecruiterId(7L);
+
+        Mockito.when(jobService.createJob(Mockito.any(CreateJobRequest.class), Mockito.eq(7L))).thenReturn(job);
+
+        mockMvc.perform(post("/api/jobs")
+                        .header("X-User-Role", "ROLE_RECRUITER")
+                        .header("X-User-Id", "7")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(3))
+                .andExpect(jsonPath("$.recruiterId").value(7));
+    }
+
+    @Test
     void allJobs_shouldReturnList() throws Exception {
         Job job = new Job();
         job.setId(2L);

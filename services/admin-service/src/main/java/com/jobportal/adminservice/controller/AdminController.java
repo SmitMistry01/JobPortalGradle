@@ -21,7 +21,7 @@ public class AdminController {
 
     @GetMapping("/users")
     public ResponseEntity<List<Map<String, Object>>> users(@RequestHeader("X-User-Role") String role) {
-        if (!"ADMIN".equalsIgnoreCase(role)) {
+        if (!hasRole(role, "ADMIN")) {
             return ResponseEntity.status(403).build();
         }
         return ResponseEntity.ok(adminFacadeService.users());
@@ -29,7 +29,7 @@ public class AdminController {
 
     @GetMapping("/jobs")
     public ResponseEntity<List<Map<String, Object>>> jobs(@RequestHeader("X-User-Role") String role) {
-        if (!"ADMIN".equalsIgnoreCase(role)) {
+        if (!hasRole(role, "ADMIN")) {
             return ResponseEntity.status(403).build();
         }
         return ResponseEntity.ok(adminFacadeService.jobs());
@@ -37,9 +37,20 @@ public class AdminController {
 
     @GetMapping("/reports")
     public ResponseEntity<Map<String, Object>> reports(@RequestHeader("X-User-Role") String role) {
-        if (!"ADMIN".equalsIgnoreCase(role)) {
+        if (!hasRole(role, "ADMIN")) {
             return ResponseEntity.status(403).build();
         }
         return ResponseEntity.ok(adminFacadeService.reports());
+    }
+
+    private boolean hasRole(String actualRole, String expectedRole) {
+        if (actualRole == null || actualRole.isBlank()) {
+            return false;
+        }
+        String normalized = actualRole.trim();
+        if (normalized.regionMatches(true, 0, "ROLE_", 0, 5)) {
+            normalized = normalized.substring(5);
+        }
+        return expectedRole.equalsIgnoreCase(normalized);
     }
 }

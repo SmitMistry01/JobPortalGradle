@@ -41,4 +41,14 @@ class AdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(1));
     }
+
+    @Test
+    void users_shouldReturnList_forRolePrefixedAdmin() throws Exception {
+        Mockito.when(adminFacadeService.users()).thenReturn(List.of(Map.of("id", 2, "email", "c@d.com")));
+
+        mockMvc.perform(get("/api/admin/users")
+                        .header("X-User-Role", "ROLE_ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(2));
+    }
 }
