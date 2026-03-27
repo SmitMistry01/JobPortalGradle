@@ -5,8 +5,10 @@ import com.jobportal.applicationservice.model.ApplicationStatus;
 import com.jobportal.applicationservice.model.JobApplication;
 import com.jobportal.applicationservice.service.ApplicationDomainService;
 import java.util.List;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/applications")
@@ -27,6 +29,20 @@ public class ApplicationController {
             return ResponseEntity.status(403).build();
         }
         return ResponseEntity.ok(service.apply(request, userId, userEmail));
+    }
+
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<JobApplication> applyWithResume(
+            @RequestParam Long jobId,
+            @RequestPart("resume") MultipartFile resume,
+            @RequestHeader("X-User-Id") Long userId,
+            @RequestHeader("X-User-Email") String userEmail,
+            @RequestHeader("X-User-Role") String role
+    ) {
+        if (!hasRole(role, "JOB_SEEKER")) {
+            return ResponseEntity.status(403).build();
+        }
+        return ResponseEntity.ok(service.applyWithResume(jobId, resume, userId, userEmail));
     }
 
     @GetMapping("/user")
@@ -51,6 +67,19 @@ public class ApplicationController {
             return ResponseEntity.status(403).build();
         }
         return ResponseEntity.ok(service.updateStatus(id, status));
+    }
+
+    @PutMapping(value = "/{id}/resume", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<JobApplication> replaceResume(
+            @PathVariable Long id,
+            @RequestPart("resume") MultipartFile resume,
+            @RequestHeader("X-User-Id") Long userId,
+            @RequestHeader("X-User-Role") String role
+    ) {
+        if (!hasRole(role, "JOB_SEEKER")) {
+            return ResponseEntity.status(403).build();
+        }
+        return ResponseEntity.ok(service.replaceResume(id, resume, userId));
     }
 
     private boolean hasAnyRole(String actualRole, String... expectedRoles) {

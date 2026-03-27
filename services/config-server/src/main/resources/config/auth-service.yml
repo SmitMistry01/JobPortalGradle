@@ -10,6 +10,15 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  cache:
+    type: redis
+    redis:
+      time-to-live: 120000
+      cache-null-values: false
 
   application:
     name: auth-service
@@ -26,4 +35,23 @@ security:
   jwt:
     secret: my-super-secret-jwt-key-my-super-secret-jwt-key
     expiration-ms: 86400000
+
+cloudinary:
+  cloud-name: ${CLOUDINARY_CLOUD_NAME:}
+  api-key: ${CLOUDINARY_API_KEY:}
+  api-secret: ${CLOUDINARY_API_SECRET:}
+  folders:
+    profile-images: job-portal/profile-images
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans
 

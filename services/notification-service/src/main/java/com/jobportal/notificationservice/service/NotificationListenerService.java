@@ -4,31 +4,22 @@ import com.jobportal.notificationservice.event.ApplicationStatusEvent;
 import com.jobportal.notificationservice.event.JobPostedEvent;
 import java.util.List;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 @Service
 public class NotificationListenerService {
 
     private final EmailSenderService emailSenderService;
-    private final RestTemplate restTemplate;
+    private final AuthUserEmailService authUserEmailService;
 
-    public NotificationListenerService(EmailSenderService emailSenderService, RestTemplate restTemplate) {
+    public NotificationListenerService(EmailSenderService emailSenderService, AuthUserEmailService authUserEmailService) {
         this.emailSenderService = emailSenderService;
-        this.restTemplate = restTemplate;
+        this.authUserEmailService = authUserEmailService;
     }
 
     @RabbitListener(queues = "job.notifications")
     public void onJobPosted(JobPostedEvent event) {
-        List<String> emails = restTemplate.exchange(
-                "http://AUTH-SERVICE/api/auth/internal/users/emails",
-                HttpMethod.GET,
-                null,
-                new ParameterizedTypeReference<List<String>>() {
-                }
-        ).getBody();
+        List<String> emails = authUserEmailService.getAllUserEmails();
 
         if (emails == null || emails.isEmpty()) {
             return;

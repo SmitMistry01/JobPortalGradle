@@ -1,9 +1,9 @@
 package com.jobportal.adminservice.controller;
 
 import com.jobportal.adminservice.service.AdminFacadeService;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,31 +19,24 @@ public class AdminController {
         this.adminFacadeService = adminFacadeService;
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/users")
     public ResponseEntity<List<Map<String, Object>>> users(@RequestHeader("X-User-Role") String role) {
-        if (!hasRole(role, "ADMIN")) {
-            return ResponseEntity.status(403).build();
-        }
         return ResponseEntity.ok(adminFacadeService.users());
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/jobs")
     public ResponseEntity<List<Map<String, Object>>> jobs(@RequestHeader("X-User-Role") String role) {
-        if (!hasRole(role, "ADMIN")) {
-            return ResponseEntity.status(403).build();
-        }
         return ResponseEntity.ok(adminFacadeService.jobs());
     }
-
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/reports")
     public ResponseEntity<Map<String, Object>> reports(@RequestHeader("X-User-Role") String role) {
-        if (!hasRole(role, "ADMIN")) {
-            return ResponseEntity.status(403).build();
-        }
         return ResponseEntity.ok(adminFacadeService.reports());
     }
 
-    private boolean hasRole(String actualRole, String expectedRole) {
+    public boolean hasRole(String actualRole, String expectedRole) {
         if (actualRole == null || actualRole.isBlank()) {
             return false;
         }

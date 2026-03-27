@@ -27,6 +27,9 @@ public class User {
 
     private String phone;
 
+    @Column(name = "profile_image_url")
+    private String profileImageUrl;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -89,6 +92,14 @@ public class User {
 
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+
+    public String getProfileImageUrl() {
+        return profileImageUrl;
+    }
+
+    public void setProfileImageUrl(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
     }
 
     public LocalDateTime getCreatedAt() {

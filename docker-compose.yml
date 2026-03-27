@@ -28,6 +28,64 @@ services:
       timeout: 5s
       retries: 12
 
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
+
+  sonar-db:
+    image: postgres:16-alpine
+    container_name: sonar-db
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonar
+      POSTGRES_DB: sonarqube
+    volumes:
+      - sonarqube_db_data:/var/lib/postgresql/data
+
+  sonarqube:
+    image: sonarqube:lts-community
+    container_name: sonarqube
+    depends_on:
+      - sonar-db
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://sonar-db:5432/sonarqube
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: sonar
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube_extensions:/opt/sonarqube/extensions
+
+  zipkin:
+    image: openzipkin/zipkin:2.24
+    container_name: zipkin
+    ports:
+      - "9411:9411"
+
   config-server:
     build:
       context: .
@@ -37,6 +95,8 @@ services:
     container_name: config-server
     ports:
       - "8888:8888"
+    environment:
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
 
   discovery-server:
     build:
@@ -49,6 +109,7 @@ services:
       - "8761:8761"
     environment:
       SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     depends_on:
       - config-server
 
@@ -68,11 +129,14 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/auth_db
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: smit
+      SPRING_DATA_REDIS_HOST: redis
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
       SECURITY_JWT_SECRET: my-super-secret-jwt-key-my-super-secret-jwt-key
     depends_on:
       - config-server
       - discovery-server
       - mysql
+      - redis
 
   job-service:
     build:
@@ -90,12 +154,15 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/job_db
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: smit
+      SPRING_DATA_REDIS_HOST: redis
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
       SPRING_RABBITMQ_HOST: rabbitmq
     depends_on:
       - config-server
       - discovery-server
       - mysql
       - rabbitmq
+      - redis
 
   application-service:
     build:
@@ -113,6 +180,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/user_db
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: smit
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
       SPRING_RABBITMQ_HOST: rabbitmq
     depends_on:
       - config-server
@@ -133,9 +201,12 @@ services:
       SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
       EUREKA_INSTANCE_HOSTNAME: admin-service
+      SPRING_DATA_REDIS_HOST: redis
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     depends_on:
       - config-server
       - discovery-server
+      - redis
 
   notification-service:
     build:
@@ -151,6 +222,8 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
       EUREKA_INSTANCE_HOSTNAME: notification-service
       SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_DATA_REDIS_HOST: redis
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
       SPRING_MAIL_HOST: smtp.gmail.com
       SPRING_MAIL_PORT: 587
       SPRING_MAIL_USERNAME: jobportall121@gmail.com
@@ -161,6 +234,7 @@ services:
       - config-server
       - discovery-server
       - rabbitmq
+      - redis
 
   api-gateway:
     build:
@@ -175,6 +249,7 @@ services:
       SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
       EUREKA_INSTANCE_HOSTNAME: api-gateway
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
       SECURITY_JWT_SECRET: my-super-secret-jwt-key-my-super-secret-jwt-key
     depends_on:
       - config-server
@@ -183,6 +258,12 @@ services:
       - job-service
       - application-service
       - admin-service
+      - zipkin
 
 volumes:
   mysql_data:
+  grafana_data:
+  sonarqube_db_data:
+  sonarqube_data:
+  sonarqube_logs:
+  sonarqube_extensions:

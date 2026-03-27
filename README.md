@@ -1,6 +1,6 @@
 # Job Portal Backend (Spring Boot Microservices, Gradle, JDK 21)
 
-This is a complete backend for a Job Portal System using Spring Boot microservices, service discovery, centralized configuration, API Gateway, JWT authentication, RabbitMQ, and Gmail SMTP notifications.
+This is a complete backend for a Job Portal System using Spring Boot microservices, service discovery, centralized configuration, API Gateway, JWT authentication, Redis caching, RabbitMQ, Zipkin tracing, Prometheus/Grafana monitoring, SonarQube code-quality analysis, and Gmail SMTP notifications.
 
 ## Services
 
@@ -32,7 +32,12 @@ Service registration and routing are handled with Eureka + Gateway.
 - Spring Cloud 2023.x
 - Gradle multi-module
 - MySQL
+- Redis
 - RabbitMQ
+- Zipkin
+- Prometheus
+- Grafana
+- SonarQube
 - Gmail SMTP
 
 ## Databases (MySQL)
@@ -145,10 +150,186 @@ On first run, MySQL auto-creates `auth_db`, `job_db`, and `user_db` from `infras
 
 ```powershell
 docker compose ps
-docker composJete logs -f api-gateway
+docker compose logs -f api-gateway
 docker compose logs -f discovery-server
 ```
-j
+
+### Infra dashboards
+
+- Eureka: `http://localhost:8761`
+- Zipkin: `http://localhost:9411`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000` (default login: `admin` / `admin`)
+- SonarQube: `http://localhost:9000`
+
+## What Is Implemented and Why
+
+### 1) Redis Caching (implemented)
+
+**What was added**
+
+- `spring-boot-starter-cache` and `spring-boot-starter-data-redis` in business services using cache
+- Redis cache config with JSON serializer for safer object serialization
+- Cache annotations in:
+  - `job-service` (`getAllJobs`, `getJob`, `search`, evict on `createJob`)
+  - `auth-service` (`getAllUsers`, `getAllUserEmails`, evict on `register`)
+  - `admin-service` (`users`, `jobs`, `reports`)
+  - `notification-service` (cached email list fetch via `AuthUserEmailService`)
+
+**Why**
+
+- Reduces repeated DB and cross-service read load
+- Improves response latency for high-read endpoints
+- Keeps write paths simple and data freshness controlled by TTL + targeted evictions
+
+### 2) Distributed Tracing with Zipkin (implemented)
+
+**What was added**
+
+- Tracing dependencies in all services:
+  - `io.micrometer:micrometer-tracing-bridge-brave`
+  - `io.zipkin.reporter2:zipkin-reporter-brave`
+- Zipkin endpoint configuration in centralized Config Server files
+- Local fallback tracing configuration in service-local `application.yml` files
+- `zipkin` service in `docker-compose.yml`
+
+**Why**
+
+- Lets you follow one request across gateway + downstream microservices
+- Makes root-cause analysis faster for `401/403/500` and latency issues
+- Improves observability of async flows (RabbitMQ producer/consumer chains)
+
+### 3) Metrics + Dashboards (Prometheus + Grafana) (implemented)
+
+**What was added**
+
+- `io.micrometer:micrometer-registry-prometheus` in all services
+- Actuator exposure for `health`, `info`, `prometheus`
+- `prometheus` service with scrape config (`infrastructure/prometheus/prometheus.yml`)
+- `grafana` service with provisioned Prometheus datasource
+
+**Why**
+
+- Prometheus stores service metrics over time (RPS, latency, JVM, errors)
+- Grafana visualizes trends and helps capacity/performance tuning
+- Complements Zipkin: metrics show *what* is wrong; traces show *where*
+
+### 4) SonarQube (implemented)
+
+**What was added**
+
+- SonarQube + PostgreSQL services in `docker-compose.yml`
+- Root Gradle Sonar plugin in `build.gradle`
+
+**Why**
+
+- Continuous static analysis for bugs, code smells, maintainability and security hotspots
+- Gives quality gates before merges/releases
+
+### 5) Cloudinary Uploads (implemented)
+
+**What was added**
+
+- `auth-service`: multipart register support on `POST /api/auth/register` for optional `profileImage`
+- `application-service`: multipart apply support on `POST /api/applications` for resume file upload
+- Cloudinary config keys in Config Server:
+  - `cloudinary.cloud-name`
+  - `cloudinary.api-key`
+  - `cloudinary.api-secret`
+  - folders under `cloudinary.folders.*`
+
+**Why**
+
+- Avoids storing image/resume binary data inside service databases
+- Gives stable hosted URLs for profile images and resumes
+- Keeps existing JSON APIs backward-compatible while enabling file uploads
+
+### Cloudinary setup for local run
+
+Set these in your terminal before starting services (or set as system environment variables):
+
+```powershell
+$env:CLOUDINARY_CLOUD_NAME="<your-cloud-name>"
+$env:CLOUDINARY_API_KEY="<your-api-key>"
+$env:CLOUDINARY_API_SECRET="<your-api-secret>"
+```
+
+### Cloudinary API test commands
+
+Register with profile image:
+
+```powershell
+curl.exe -X POST "http://localhost:8080/api/auth/register" `
+  -F "name=User One" `
+  -F "email=user1@example.com" `
+  -F "password=password123" `
+  -F "role=JOB_SEEKER" `
+  -F "phone=9999999999" `
+  -F "profileImage=@C:/path/to/profile.png"
+```
+
+Apply for a job with resume upload:
+
+```powershell
+curl.exe -X POST "http://localhost:8080/api/applications" `
+  -H "Authorization: Bearer <JOB_SEEKER_JWT>" `
+  -F "jobId=5" `
+  -F "resume=@C:/path/to/resume.pdf"
+```
+
+Replace logged-in user's profile image:
+
+```powershell
+curl.exe -X PUT "http://localhost:8080/api/auth/profile/image" `
+  -H "Authorization: Bearer <JWT>" `
+  -F "profileImage=@C:/path/to/new-profile.png"
+```
+
+Replace a job seeker's own application resume:
+
+```powershell
+curl.exe -X PUT "http://localhost:8080/api/applications/13/resume" `
+  -H "Authorization: Bearer <JOB_SEEKER_JWT>" `
+  -F "resume=@C:/path/to/new-resume.pdf"
+```
+
+## Observability & Quality Quick Start
+
+### 1) Start infrastructure only
+
+```powershell
+docker compose up -d mysql rabbitmq redis zipkin prometheus grafana sonar-db sonarqube
+```
+
+### 2) Start microservices (local)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\infrastructure\start-local.ps1
+```
+
+### 3) Generate sample traffic
+
+```powershell
+Invoke-RestMethod "http://localhost:8080/api/jobs"
+Invoke-RestMethod "http://localhost:8080/api/jobs/search?title=java&location=pune"
+```
+
+### 4) Validate telemetry endpoints
+
+```powershell
+Invoke-WebRequest "http://localhost:8080/actuator/prometheus" -UseBasicParsing
+Invoke-WebRequest "http://localhost:9090/-/healthy" -UseBasicParsing
+Invoke-WebRequest "http://localhost:9411/zipkin/" -UseBasicParsing
+```
+
+### 5) Run Sonar analysis
+
+```powershell
+# first login at http://localhost:9000 and create a token
+$env:SONAR_HOST_URL="http://localhost:9000"
+$env:SONAR_TOKEN="<YOUR_SONAR_TOKEN>"
+.\gradlew sonarqube -Dsonar.token=$env:SONAR_TOKEN
+```
 ### Stop everything
 
 ```powershell
@@ -384,7 +565,7 @@ curl --location 'http://localhost:8080/api/jobs' \
 - Gmail SMTP is configured using:
 	- `jobportall121@gmail.com`
 	- app password: `tyrwqxhcmvwaxjjq`
-- `auth-service` MySQL DB in config is `auth_ab` (as per your DB setup).
+- `auth-service` MySQL DB in config is `auth_db`.
 - If your existing `users` table has a non-null `username` column, registration now supports `username` in payload and auto-generates it from email when omitted.
 - If you change config files in `config-server`, restart all services in order so they reload updated config.
 - For production, move secrets to environment variables or a secret manager.

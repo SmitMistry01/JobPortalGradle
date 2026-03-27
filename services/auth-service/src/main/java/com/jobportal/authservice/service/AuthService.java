@@ -9,8 +9,12 @@ import com.jobportal.authservice.model.User;
 import com.jobportal.authservice.repository.UserRepository;
 import com.jobportal.authservice.security.JwtService;
 import java.util.List;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class AuthService {
@@ -18,13 +22,56 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final CloudinaryProfileImageService cloudinaryProfileImageService;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
+    public AuthService(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService,
+            CloudinaryProfileImageService cloudinaryProfileImageService
+    ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.cloudinaryProfileImageService = cloudinaryProfileImageService;
     }
 
+    public UserResponse registerWithProfileImage(RegisterRequest request, MultipartFile profileImage) {
+        if (profileImage != null && !profileImage.isEmpty()) {
+            request.setProfileImageUrl(cloudinaryProfileImageService.uploadProfileImage(profileImage));
+        }
+        return register(request);
+    }
+
+    public UserResponse replaceProfileImage(Long userId, MultipartFile profileImage) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        String oldProfileImageUrl = user.getProfileImageUrl();
+        String newProfileImageUrl = cloudinaryProfileImageService.uploadProfileImage(profileImage);
+
+        user.setProfileImageUrl(newProfileImageUrl);
+        User saved = userRepository.save(user);
+
+        if (oldProfileImageUrl != null && !oldProfileImageUrl.isBlank()
+                && !oldProfileImageUrl.equals(newProfileImageUrl)) {
+            cloudinaryProfileImageService.deleteByUrl(oldProfileImageUrl);
+        }
+
+        return new UserResponse(
+                saved.getId(),
+                saved.getName(),
+                saved.getEmail(),
+                saved.getRole(),
+                saved.getPhone(),
+                saved.getProfileImageUrl()
+        );
+    }
+
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "authUsers", allEntries = true),
+            @CacheEvict(cacheNames = "authUserEmails", allEntries = true)
+    })
     public UserResponse register(RegisterRequest request) {
         validateRegisterRequest(request);
 
@@ -39,9 +86,17 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setPhone(request.getPhone());
         user.setRole(request.getRole() == null ? Role.JOB_SEEKER : request.getRole());
+        user.setProfileImageUrl(request.getProfileImageUrl());
 
         User saved = userRepository.save(user);
-        return new UserResponse(saved.getId(), saved.getName(), saved.getEmail(), saved.getRole(), saved.getPhone());
+        return new UserResponse(
+                saved.getId(),
+                saved.getName(),
+                saved.getEmail(),
+                saved.getRole(),
+                saved.getPhone(),
+                saved.getProfileImageUrl()
+        );
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -56,12 +111,21 @@ public class AuthService {
         return new AuthResponse(token, user.getId(), user.getEmail(), user.getRole().name());
     }
 
+    @Cacheable(cacheNames = "authUsers")
     public List<UserResponse> getAllUsers() {
         return userRepository.findAll().stream()
-                .map(u -> new UserResponse(u.getId(), u.getName(), u.getEmail(), u.getRole(), u.getPhone()))
+                .map(u -> new UserResponse(
+                        u.getId(),
+                        u.getName(),
+                        u.getEmail(),
+                        u.getRole(),
+                        u.getPhone(),
+                        u.getProfileImageUrl()
+                ))
                 .toList();
     }
 
+    @Cacheable(cacheNames = "authUserEmails")
     public List<String> getAllUserEmails() {
         return userRepository.findAll().stream().map(User::getEmail).toList();
     }

@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'org.sonarqube' version '5.1.0.4882'
 }
 
 allprojects {
@@ -12,20 +13,26 @@ allprojects {
 }
 
 subprojects {
-    apply plugin: 'java'
+    if (project.path != ':services') {
+        apply plugin: 'java'
 
-    java {
-        toolchain {
-            languageVersion = JavaLanguageVersion.of(21)
+        java {
+            toolchain {
+                languageVersion = JavaLanguageVersion.of(21)
+            }
+        }
+
+        tasks.withType(Test).configureEach {
+            useJUnitPlatform()
         }
     }
+}
 
-    dependencies {
-        testImplementation 'org.springframework.boot:spring-boot-starter-test'
-        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    }
-
-    tasks.withType(Test).configureEach {
-        useJUnitPlatform()
+sonar {
+    properties {
+        property 'sonar.projectKey', 'jobsportalgradle'
+        property 'sonar.projectName', 'jobsportalgradle'
+        property 'sonar.host.url', System.getenv('SONAR_HOST_URL') ?: 'http://localhost:9000'
     }
 }
+

@@ -12,8 +12,12 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -125,5 +129,85 @@ class ApplicationControllerTest {
                         .param("status", "SELECTED"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SELECTED"));
+    }
+
+    @Test
+    void applyMultipart_shouldCreateApplication_forJobSeeker() throws Exception {
+        MockMultipartFile resume = new MockMultipartFile(
+                "resume",
+                "resume.pdf",
+                "application/pdf",
+                "resume-content".getBytes()
+        );
+
+        JobApplication application = new JobApplication();
+        application.setId(13L);
+        application.setJobId(7L);
+        application.setUserId(11L);
+        application.setStatus(ApplicationStatus.APPLIED);
+
+        Mockito.when(service.applyWithResume(eq(7L), any(), eq(11L), eq("user@example.com")))
+                .thenReturn(application);
+
+        mockMvc.perform(multipart("/api/applications")
+                        .file(resume)
+                        .param("jobId", "7")
+                        .header("X-User-Id", "11")
+                        .header("X-User-Email", "user@example.com")
+                        .header("X-User-Role", "JOB_SEEKER")
+                        .contentType(MediaType.MULTIPART_FORM_DATA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(13));
+    }
+
+    @Test
+    void replaceResume_shouldUpdate_forJobSeekerOwner() throws Exception {
+        MockMultipartFile resume = new MockMultipartFile(
+                "resume",
+                "resume-updated.pdf",
+                "application/pdf",
+                "updated-resume-content".getBytes()
+        );
+
+        JobApplication updated = new JobApplication();
+        updated.setId(13L);
+        updated.setUserId(11L);
+        updated.setJobId(7L);
+        updated.setResumeUrl("https://res.cloudinary.com/demo/raw/upload/v2/resume-updated.pdf");
+
+        Mockito.when(service.replaceResume(eq(13L), any(), eq(11L))).thenReturn(updated);
+
+        mockMvc.perform(multipart("/api/applications/13/resume")
+                        .file(resume)
+                        .header("X-User-Id", "11")
+                        .header("X-User-Role", "JOB_SEEKER")
+                        .with(request -> {
+                            request.setMethod("PUT");
+                            return request;
+                        })
+                        .contentType(MediaType.MULTIPART_FORM_DATA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(13));
+    }
+
+    @Test
+    void replaceResume_shouldReturnForbidden_forNonJobSeeker() throws Exception {
+        MockMultipartFile resume = new MockMultipartFile(
+                "resume",
+                "resume-updated.pdf",
+                "application/pdf",
+                "updated-resume-content".getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/applications/13/resume")
+                        .file(resume)
+                        .header("X-User-Id", "11")
+                        .header("X-User-Role", "RECRUITER")
+                        .with(request -> {
+                            request.setMethod("PUT");
+                            return request;
+                        })
+                        .contentType(MediaType.MULTIPART_FORM_DATA))
+                .andExpect(status().isForbidden());
     }
 }

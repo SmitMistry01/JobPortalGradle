@@ -9,6 +9,7 @@ public class RegisterRequest {
     private String password;
     private Role role;
     private String phone;
+    private String profileImageUrl;
 
     public String getName() {
         return name;
@@ -56,5 +57,13 @@ public class RegisterRequest {
 
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+
+    public String getProfileImageUrl() {
+        return profileImageUrl;
+    }
+
+    public void setProfileImageUrl(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
     }
 }

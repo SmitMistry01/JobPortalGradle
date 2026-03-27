@@ -6,6 +6,9 @@ import com.jobportal.jobservice.model.Job;
 import com.jobportal.jobservice.repository.JobRepository;
 import java.util.List;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -19,6 +22,11 @@ public class JobService {
         this.rabbitTemplate = rabbitTemplate;
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "jobsAll", allEntries = true),
+            @CacheEvict(cacheNames = "jobsById", allEntries = true),
+            @CacheEvict(cacheNames = "jobsSearch", allEntries = true)
+    })
     public Job createJob(CreateJobRequest request, Long recruiterId) {
         Job job = new Job();
         job.setTitle(request.getTitle());
@@ -36,14 +44,17 @@ public class JobService {
         return saved;
     }
 
+    @Cacheable(cacheNames = "jobsAll")
     public List<Job> getAllJobs() {
         return jobRepository.findAll();
     }
 
+    @Cacheable(cacheNames = "jobsById", key = "#id")
     public Job getJob(Long id) {
         return jobRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Job not found"));
     }
 
+    @Cacheable(cacheNames = "jobsSearch", key = "(#title == null ? '' : #title.toLowerCase()) + '::' + (#location == null ? '' : #location.toLowerCase())")
     public List<Job> search(String title, String location) {
         return jobRepository.findByTitleContainingIgnoreCaseAndLocationContainingIgnoreCase(
                 title == null ? "" : title,

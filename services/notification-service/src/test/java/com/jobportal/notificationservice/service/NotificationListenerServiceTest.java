@@ -4,28 +4,19 @@ import com.jobportal.notificationservice.event.ApplicationStatusEvent;
 import com.jobportal.notificationservice.event.JobPostedEvent;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.client.RestTemplate;
 
 class NotificationListenerServiceTest {
 
     @Test
     void onJobPosted_shouldSendToAllUsers() {
         EmailSenderService emailSenderService = Mockito.mock(EmailSenderService.class);
-        RestTemplate restTemplate = Mockito.mock(RestTemplate.class);
+        AuthUserEmailService authUserEmailService = Mockito.mock(AuthUserEmailService.class);
 
-        Mockito.when(restTemplate.exchange(
-                        Mockito.eq("http://AUTH-SERVICE/api/auth/internal/users/emails"),
-                        Mockito.eq(HttpMethod.GET),
-                        Mockito.isNull(),
-                        ArgumentMatchers.<ParameterizedTypeReference<List<String>>>any()))
-                .thenReturn(ResponseEntity.ok(List.of("u1@example.com", "u2@example.com")));
+        Mockito.when(authUserEmailService.getAllUserEmails())
+                .thenReturn(List.of("u1@example.com", "u2@example.com"));
 
-        NotificationListenerService listener = new NotificationListenerService(emailSenderService, restTemplate);
+        NotificationListenerService listener = new NotificationListenerService(emailSenderService, authUserEmailService);
 
         JobPostedEvent event = new JobPostedEvent();
         event.setJobId(1L);
@@ -41,8 +32,8 @@ class NotificationListenerServiceTest {
     @Test
     void onApplicationStatusChanged_shouldSendToCandidate() {
         EmailSenderService emailSenderService = Mockito.mock(EmailSenderService.class);
-        RestTemplate restTemplate = Mockito.mock(RestTemplate.class);
-        NotificationListenerService listener = new NotificationListenerService(emailSenderService, restTemplate);
+        AuthUserEmailService authUserEmailService = Mockito.mock(AuthUserEmailService.class);
+        NotificationListenerService listener = new NotificationListenerService(emailSenderService, authUserEmailService);
 
         ApplicationStatusEvent event = new ApplicationStatusEvent();
         event.setApplicationId(10L);

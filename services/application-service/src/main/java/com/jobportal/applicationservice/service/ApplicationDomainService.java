@@ -8,19 +8,57 @@ import com.jobportal.applicationservice.repository.JobApplicationRepository;
 import java.util.List;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class ApplicationDomainService {
 
     private final JobApplicationRepository repository;
     private final RabbitTemplate rabbitTemplate;
+    private final CloudinaryResumeService cloudinaryResumeService;
 
-    public ApplicationDomainService(JobApplicationRepository repository, RabbitTemplate rabbitTemplate) {
+    public ApplicationDomainService(
+            JobApplicationRepository repository,
+            RabbitTemplate rabbitTemplate,
+            CloudinaryResumeService cloudinaryResumeService
+    ) {
         this.repository = repository;
         this.rabbitTemplate = rabbitTemplate;
+        this.cloudinaryResumeService = cloudinaryResumeService;
+    }
+
+    public JobApplication applyWithResume(Long jobId, MultipartFile resume, Long userId, String userEmail) {
+        ApplyJobRequest request = new ApplyJobRequest();
+        request.setJobId(jobId);
+        request.setResumeUrl(cloudinaryResumeService.uploadResume(resume));
+        return apply(request, userId, userEmail);
+    }
+
+    public JobApplication replaceResume(Long applicationId, MultipartFile resume, Long userId) {
+        JobApplication application = repository.findById(applicationId)
+                .orElseThrow(() -> new IllegalArgumentException("Application not found"));
+
+        if (!application.getUserId().equals(userId)) {
+            throw new IllegalArgumentException("You can update only your own application");
+        }
+
+        String oldResumeUrl = application.getResumeUrl();
+        String newResumeUrl = cloudinaryResumeService.uploadResume(resume);
+
+        application.setResumeUrl(newResumeUrl);
+        JobApplication saved = repository.save(application);
+
+        if (oldResumeUrl != null && !oldResumeUrl.isBlank() && !oldResumeUrl.equals(newResumeUrl)) {
+            cloudinaryResumeService.deleteByUrl(oldResumeUrl);
+        }
+
+        return saved;
     }
 
     public JobApplication apply(ApplyJobRequest request, Long userId, String userEmail) {
+        if (request.getResumeUrl() == null || request.getResumeUrl().isBlank()) {
+            throw new IllegalArgumentException("Resume URL is required");
+        }
         if (repository.existsByUserIdAndJobId(userId, request.getJobId())) {
             throw new IllegalArgumentException("You already applied for this job");
         }
