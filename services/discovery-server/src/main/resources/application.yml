@@ -1,10 +1,22 @@
+server:
+  port: 8761
+
 spring:
   application:
     name: discovery-server
   config:
     import: optional:configserver:http://localhost:8888
 
+eureka:
+  client:
+    register-with-eureka: false
+    fetch-registry: false
+
 management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
   tracing:
     sampling:
       probability: 1.0

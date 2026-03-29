@@ -22,8 +22,7 @@ schema_config:
 
 storage_config:
   filesystem:
-    chunks_directory: /loki/chunks
-    rules_directory: /loki/rules
+    directory: /loki/chunks
 
 limits_config:
   retention_period: 168h
@@ -32,7 +31,13 @@ compactor:
   working_directory: /loki/compactor
   compaction_interval: 10m
   retention_enabled: true
+  delete_request_store: filesystem
 
 ruler:
+  storage:
+    type: local
+    local:
+      directory: /loki/rules
+  rule_path: /loki/rules-temp
   alertmanager_url: http://localhost:9093
 
