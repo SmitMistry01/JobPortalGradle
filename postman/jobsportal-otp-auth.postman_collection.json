@@ -1,0 +1,306 @@
+{
+  "info": {
+    "_postman_id": "96d85d4f-7f5a-428e-b8bb-0e2ef3ad642f",
+    "name": "Jobs Portal - Auth OTP Strict Flow",
+    "description": "Strict OTP-only registration and forgot-password flow for auth-service via API Gateway.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1) Register - Request OTP",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"{{name}}\",\n  \"email\": \"{{email}}\",\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\",\n  \"role\": \"{{role}}\",\n  \"phone\": \"{{phone}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/register/request-otp",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "register",
+            "request-otp"
+          ]
+        }
+      }
+    },
+    {
+      "name": "2) Register - Verify OTP",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"otp\": \"{{registrationOtp}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/register/verify-otp",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "register",
+            "verify-otp"
+          ]
+        }
+      }
+    },
+    {
+      "name": "3) Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "var jsonData = pm.response.json();",
+              "if (jsonData && jsonData.token) {",
+              "  pm.collectionVariables.set('authToken', jsonData.token);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "login"
+          ]
+        }
+      }
+    },
+    {
+      "name": "4) Forgot Password - Request OTP",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/password/forgot/request-otp",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "password",
+            "forgot",
+            "request-otp"
+          ]
+        }
+      }
+    },
+    {
+      "name": "5) Forgot Password - Verify OTP",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "var jsonData = pm.response.json();",
+              "if (jsonData && jsonData.resetToken) {",
+              "  pm.collectionVariables.set('resetToken', jsonData.resetToken);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"otp\": \"{{forgotOtp}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/password/forgot/verify-otp",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "password",
+            "forgot",
+            "verify-otp"
+          ]
+        }
+      }
+    },
+    {
+      "name": "6) Forgot Password - Reset Password",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"resetToken\": \"{{resetToken}}\",\n  \"newPassword\": \"{{newPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/password/reset",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "password",
+            "reset"
+          ]
+        }
+      }
+    },
+    {
+      "name": "7) Strict Check - Direct Register Disabled (410)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 410 Gone', function () {",
+              "  pm.response.to.have.status(410);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Direct User\",\n  \"email\": \"direct@example.com\",\n  \"password\": \"password123\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/register",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "register"
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "name",
+      "value": "User One"
+    },
+    {
+      "key": "email",
+      "value": "user1@example.com"
+    },
+    {
+      "key": "username",
+      "value": "user1"
+    },
+    {
+      "key": "password",
+      "value": "password123"
+    },
+    {
+      "key": "newPassword",
+      "value": "newPass123"
+    },
+    {
+      "key": "role",
+      "value": "JOB_SEEKER"
+    },
+    {
+      "key": "phone",
+      "value": "9999999999"
+    },
+    {
+      "key": "registrationOtp",
+      "value": "123456"
+    },
+    {
+      "key": "forgotOtp",
+      "value": "123456"
+    },
+    {
+      "key": "resetToken",
+      "value": ""
+    },
+    {
+      "key": "authToken",
+      "value": ""
+    }
+  ]
+}
+

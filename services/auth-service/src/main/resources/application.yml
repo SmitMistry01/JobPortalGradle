@@ -1,11 +1,29 @@
 spring:
   application:
     name: auth-service
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: jobportall121@gmail.com
+    password: tyrwqxhcmvwaxjjq
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
   jpa:
     hibernate:
       ddl-auto: update
   config:
     import: optional:configserver:http://localhost:8888
+
+auth:
+  otp:
+    expiry-minutes: ${AUTH_OTP_EXPIRY_MINUTES:10}
+    max-attempts: ${AUTH_OTP_MAX_ATTEMPTS:5}
+  reset-token:
+    expiry-minutes: ${AUTH_RESET_TOKEN_EXPIRY_MINUTES:15}
 
 management:
   tracing:

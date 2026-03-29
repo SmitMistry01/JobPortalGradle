@@ -1,6 +1,6 @@
 # Job Portal Backend (Spring Boot Microservices, Gradle, JDK 21)
 
-This is a complete backend for a Job Portal System using Spring Boot microservices, service discovery, centralized configuration, API Gateway, JWT authentication, Redis caching, RabbitMQ, Zipkin tracing, Prometheus/Grafana monitoring, SonarQube code-quality analysis, and Gmail SMTP notifications.
+This is a complete backend for a Job Portal System using Spring Boot microservices, service discovery, centralized configuration, API Gateway, JWT authentication, Redis caching, RabbitMQ, Zipkin tracing, Prometheus/Grafana/Loki monitoring, SonarQube code-quality analysis, and Gmail SMTP notifications.
 
 ## Services
 
@@ -37,6 +37,7 @@ Service registration and routing are handled with Eureka + Gateway.
 - Zipkin
 - Prometheus
 - Grafana
+- Loki
 - SonarQube
 - Gmail SMTP
 
@@ -159,6 +160,7 @@ docker compose logs -f discovery-server
 - Eureka: `http://localhost:8761`
 - Zipkin: `http://localhost:9411`
 - Prometheus: `http://localhost:9090`
+- Loki: `http://localhost:3100/ready`
 - Grafana: `http://localhost:3000` (default login: `admin` / `admin`)
 - SonarQube: `http://localhost:9000`
 
@@ -214,6 +216,23 @@ docker compose logs -f discovery-server
 - Grafana visualizes trends and helps capacity/performance tuning
 - Complements Zipkin: metrics show *what* is wrong; traces show *where*
 
+### 3.1) Centralized Logs with Loki + Promtail (implemented)
+
+**What was added**
+
+- `loki` and `promtail` services in `docker-compose.yml`
+- Loki datasource provisioning for Grafana in `infrastructure/grafana/provisioning/datasources/loki.yml`
+- Promtail config files:
+  - `infrastructure/promtail/promtail-docker.yml` (Docker logs + optional host log files)
+  - `infrastructure/promtail/promtail-windows.yml` (Windows host log files)
+- File logging configured per service via Config Server (`logging.file.name: logs/<service>.log`)
+
+**Why**
+
+- Lets you search logs across all services from Grafana Explore using LogQL
+- Makes debugging `401/403/500` easier by correlating logs with Prometheus metrics and Zipkin traces
+- Supports both Docker-based and localhost service runs
+
 ### 4) SonarQube (implemented)
 
 **What was added**
@@ -230,7 +249,7 @@ docker compose logs -f discovery-server
 
 **What was added**
 
-- `auth-service`: multipart register support on `POST /api/auth/register` for optional `profileImage`
+- `auth-service`: multipart OTP registration request support on `POST /api/auth/register/request-otp` for optional `profileImage`
 - `application-service`: multipart apply support on `POST /api/applications` for resume file upload
 - Cloudinary config keys in Config Server:
   - `cloudinary.cloud-name`
@@ -256,10 +275,10 @@ $env:CLOUDINARY_API_SECRET="<your-api-secret>"
 
 ### Cloudinary API test commands
 
-Register with profile image:
+Request registration OTP with profile image:
 
 ```powershell
-curl.exe -X POST "http://localhost:8080/api/auth/register" `
+curl.exe -X POST "http://localhost:8080/api/auth/register/request-otp" `
   -F "name=User One" `
   -F "email=user1@example.com" `
   -F "password=password123" `
@@ -298,7 +317,7 @@ curl.exe -X PUT "http://localhost:8080/api/applications/13/resume" `
 ### 1) Start infrastructure only
 
 ```powershell
-docker compose up -d mysql rabbitmq redis zipkin prometheus grafana sonar-db sonarqube
+docker compose up -d mysql rabbitmq redis zipkin prometheus loki promtail grafana sonar-db sonarqube
 ```
 
 ### 2) Start microservices (local)
@@ -319,7 +338,30 @@ Invoke-RestMethod "http://localhost:8080/api/jobs/search?title=java&location=pun
 ```powershell
 Invoke-WebRequest "http://localhost:8080/actuator/prometheus" -UseBasicParsing
 Invoke-WebRequest "http://localhost:9090/-/healthy" -UseBasicParsing
+Invoke-WebRequest "http://localhost:3100/ready" -UseBasicParsing
 Invoke-WebRequest "http://localhost:9411/zipkin/" -UseBasicParsing
+```
+
+### Loki in Grafana (logs)
+
+1. Open Grafana: `http://localhost:3000`
+2. Go to **Explore**
+3. Select datasource **Loki**
+4. Try these queries:
+
+```logql
+{job="docker"}
+{service="api-gateway"}
+{service="application-service"} |= "ERROR"
+```
+
+If you run services on localhost (not in Docker), Promtail also scrapes `logs/*.log` through the `host-log-files` job.
+
+### Optional: run Loki and Promtail without docker compose
+
+```powershell
+docker run -d --name loki -p 3100:3100 -v ${PWD}/infrastructure/loki/loki-config.yml:/etc/loki/loki-config.yml grafana/loki:3.1.1 -config.file=/etc/loki/loki-config.yml
+docker run -d --name promtail -v ${PWD}/infrastructure/promtail/promtail-docker.yml:/etc/promtail/promtail.yml -v ${PWD}/logs:/host-logs:ro -v /var/run/docker.sock:/var/run/docker.sock:ro grafana/promtail:3.1.1 -config.file=/etc/promtail/promtail.yml
 ```
 
 ### 5) Run Sonar analysis
@@ -411,23 +453,28 @@ You should see:
 ## Auth & JWT
 
 - Public endpoints:
-	- `POST /api/auth/register`
+	- `POST /api/auth/register/request-otp`
+	- `POST /api/auth/register/verify-otp`
 	- `POST /api/auth/login`
+	- `POST /api/auth/password/forgot/request-otp`
+	- `POST /api/auth/password/forgot/verify-otp`
+	- `POST /api/auth/password/reset`
 - All other gateway routes require `Authorization: Bearer <token>`
 - Gateway validates JWT and forwards:
 	- `X-User-Id`
 	- `X-User-Email`
 	- `X-User-Role`
+- Direct `POST /api/auth/register` is intentionally disabled in strict mode and returns `410 Gone`.
 
 ## Required Headers (Important)
 
-### 1) Register/Login (No JWT needed)
+### 1) Public auth APIs (No JWT needed)
 
-For `POST /api/auth/register` and `POST /api/auth/login`, send only:
+For OTP registration, login, and forgot-password APIs, send only:
 
 - `Content-Type: application/json`
 
-Do **not** send `Authorization` for these two public endpoints.
+Do **not** send `Authorization` for these public auth endpoints.
 
 ### 2) Protected APIs (JWT needed)
 
@@ -440,10 +487,10 @@ Do **not** manually send `X-User-Id`, `X-User-Email`, `X-User-Role`; API Gateway
 
 ## Quick API Test Commands
 
-### Register
+### Registration (strict OTP flow)
 
 ```bash
-curl --location 'http://localhost:8080/api/auth/register' \
+curl --location 'http://localhost:8080/api/auth/register/request-otp' \
 --header 'Content-Type: application/json' \
 --data-raw '{
 	"name": "User One",
@@ -452,6 +499,29 @@ curl --location 'http://localhost:8080/api/auth/register' \
 	"password": "password123",
 	"role": "JOB_SEEKER",
 	"phone": "9999999999"
+}'
+```
+
+Check your email and verify OTP:
+
+```bash
+curl --location 'http://localhost:8080/api/auth/register/verify-otp' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+	"email": "user1@example.com",
+	"otp": "123456"
+}'
+```
+
+Direct register is disabled (expected `410 Gone`):
+
+```bash
+curl --location 'http://localhost:8080/api/auth/register' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+	"name": "User One",
+	"email": "user1@example.com",
+	"password": "password123"
 }'
 ```
 
@@ -475,12 +545,75 @@ curl --location 'http://localhost:8080/api/jobs' \
 --header 'Authorization: Bearer <TOKEN>'
 ```
 
+### Forgot Password (OTP + reset)
+
+Request OTP:
+
+```bash
+curl --location 'http://localhost:8080/api/auth/password/forgot/request-otp' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+	"email": "user1@example.com"
+}'
+```
+
+Verify OTP (returns `resetToken`):
+
+```bash
+curl --location 'http://localhost:8080/api/auth/password/forgot/verify-otp' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+	"email": "user1@example.com",
+	"otp": "123456"
+}'
+```
+
+Reset password:
+
+```bash
+curl --location 'http://localhost:8080/api/auth/password/reset' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+	"email": "user1@example.com",
+	"resetToken": "<RESET_TOKEN_FROM_VERIFY_OTP>",
+	"newPassword": "newPass123"
+}'
+```
+
+### Postman Collection (import and run)
+
+Import this file in Postman:
+
+- `postman/jobsportal-otp-auth.postman_collection.json`
+
+Recommended run order inside the collection:
+
+1. `1) Register - Request OTP`
+2. Set `registrationOtp` from your email inbox
+3. `2) Register - Verify OTP`
+4. `3) Login` (auto-saves `authToken`)
+5. `4) Forgot Password - Request OTP`
+6. Set `forgotOtp` from your email inbox
+7. `5) Forgot Password - Verify OTP` (auto-saves `resetToken`)
+8. `6) Forgot Password - Reset Password`
+9. `7) Strict Check - Direct Register Disabled (410)`
+
+Notes:
+
+- Collection variable `baseUrl` defaults to `http://localhost:8080`
+- OTP values are manual because they arrive by email
+- `resetToken` is filled automatically from verify-forgot-otp response
+
 ## Main APIs
 
 ### Auth Service
 
-- `POST /api/auth/register`
+- `POST /api/auth/register/request-otp`
+- `POST /api/auth/register/verify-otp`
 - `POST /api/auth/login`
+- `POST /api/auth/password/forgot/request-otp`
+- `POST /api/auth/password/forgot/verify-otp`
+- `POST /api/auth/password/reset`
 
 ### Job Service
 
@@ -583,7 +716,7 @@ curl --location 'http://localhost:8080/api/jobs' \
 ### Manual end-to-end flow
 
 1. Start services in order (`config-server`, `discovery-server`, `api-gateway`, then business services)
-2. Register recruiter and seeker (`/api/auth/register`)
+2. Register recruiter and seeker using OTP flow (`/api/auth/register/request-otp` -> `/api/auth/register/verify-otp`)
 3. Login and copy JWT token (`/api/auth/login`)
 4. Recruiter posts job (`POST /api/jobs` with Bearer token)
 5. Seeker gets job list/search (`GET /api/jobs`, `GET /api/jobs/search`)

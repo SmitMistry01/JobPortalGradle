@@ -22,3 +22,7 @@ management:
     tracing:
       endpoint: http://localhost:9411/api/v2/spans
 
+logging:
+  file:
+    name: logs/discovery-server.log
+

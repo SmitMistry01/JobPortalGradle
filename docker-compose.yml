@@ -54,6 +54,27 @@ services:
       - grafana_data:/var/lib/grafana
       - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
 
+  loki:
+    image: grafana/loki:3.1.1
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./infrastructure/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+
+  promtail:
+    image: grafana/promtail:3.1.1
+    container_name: promtail
+    command: -config.file=/etc/promtail/promtail.yml
+    volumes:
+      - ./infrastructure/promtail/promtail-docker.yml:/etc/promtail/promtail.yml:ro
+      - ./logs:/host-logs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+
   sonar-db:
     image: postgres:16-alpine
     container_name: sonar-db
@@ -263,6 +284,7 @@ services:
 volumes:
   mysql_data:
   grafana_data:
+  loki_data:
   sonarqube_db_data:
   sonarqube_data:
   sonarqube_logs:

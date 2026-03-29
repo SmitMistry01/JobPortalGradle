@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
@@ -13,9 +14,11 @@ import org.springframework.web.client.RestTemplate;
 public class AdminFacadeService {
 
     private final RestTemplate restTemplate;
+    private final AdminFacadeService self;
 
-    public AdminFacadeService(RestTemplate restTemplate) {
+    public AdminFacadeService(RestTemplate restTemplate, @Lazy AdminFacadeService self) {
         this.restTemplate = restTemplate;
+        this.self = self;
     }
 
     @Cacheable(cacheNames = "adminUsers")
@@ -42,8 +45,8 @@ public class AdminFacadeService {
 
     @Cacheable(cacheNames = "adminReports")
     public Map<String, Object> reports() {
-        List<Map<String, Object>> users = restTemplate.users();
-        List<Map<String, Object>> jobs = restTemplate.jobs();
+        List<Map<String, Object>> users = self.users();
+        List<Map<String, Object>> jobs = self.jobs();
 
         Map<String, Object> report = new HashMap<>();
         report.put("totalUsers", users == null ? 0 : users.size());
