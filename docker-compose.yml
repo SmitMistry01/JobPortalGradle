@@ -119,8 +119,15 @@ services:
     environment:
       SERVER_PORT: 8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-server:8761/eureka
       EUREKA_INSTANCE_HOSTNAME: config-server
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8888/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
 
   discovery-server:
     build:
@@ -136,10 +143,18 @@ services:
       SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
       EUREKA_CLIENT_REGISTER_WITH_EUREKA: "false"
       EUREKA_CLIENT_FETCH_REGISTRY: "false"
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-server:8761/eureka
       EUREKA_INSTANCE_HOSTNAME: discovery-server
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
     depends_on:
-      - config-server
+      config-server:
+        condition: service_healthy
 
   auth-service:
     build:
@@ -154,18 +169,30 @@ services:
       SERVER_PORT: 8081
       SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-server:8761/eureka
       EUREKA_INSTANCE_HOSTNAME: auth-service
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/auth_db
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: smit
       SPRING_DATA_REDIS_HOST: redis
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
       SECURITY_JWT_SECRET: my-super-secret-jwt-key-my-super-secret-jwt-key
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
     depends_on:
-      - config-server
-      - discovery-server
-      - mysql
-      - redis
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   job-service:
     build:
@@ -180,6 +207,7 @@ services:
       SERVER_PORT: 8082
       SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-server:8761/eureka
       EUREKA_INSTANCE_HOSTNAME: job-service
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/job_db
       SPRING_DATASOURCE_USERNAME: root
@@ -188,11 +216,16 @@ services:
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
       SPRING_RABBITMQ_HOST: rabbitmq
     depends_on:
-      - config-server
-      - discovery-server
-      - mysql
-      - rabbitmq
-      - redis
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   application-service:
     build:
@@ -207,6 +240,7 @@ services:
       SERVER_PORT: 8083
       SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-server:8761/eureka
       EUREKA_INSTANCE_HOSTNAME: application-service
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/user_db
       SPRING_DATASOURCE_USERNAME: root
@@ -214,10 +248,14 @@ services:
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
       SPRING_RABBITMQ_HOST: rabbitmq
     depends_on:
-      - config-server
-      - discovery-server
-      - mysql
-      - rabbitmq
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
   admin-service:
     build:
@@ -232,13 +270,17 @@ services:
       SERVER_PORT: 8084
       SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-server:8761/eureka
       EUREKA_INSTANCE_HOSTNAME: admin-service
       SPRING_DATA_REDIS_HOST: redis
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     depends_on:
-      - config-server
-      - discovery-server
-      - redis
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   notification-service:
     build:
@@ -253,6 +295,7 @@ services:
       SERVER_PORT: 8085
       SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-server:8761/eureka
       EUREKA_INSTANCE_HOSTNAME: notification-service
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_DATA_REDIS_HOST: redis
@@ -264,10 +307,14 @@ services:
       SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
       SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
     depends_on:
-      - config-server
-      - discovery-server
-      - rabbitmq
-      - redis
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   api-gateway:
     build:
@@ -282,17 +329,25 @@ services:
       SERVER_PORT: 8080
       SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-server:8761/eureka
       EUREKA_INSTANCE_HOSTNAME: api-gateway
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
       SECURITY_JWT_SECRET: my-super-secret-jwt-key-my-super-secret-jwt-key
     depends_on:
-      - config-server
-      - discovery-server
-      - auth-service
-      - job-service
-      - application-service
-      - admin-service
-      - zipkin
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      job-service:
+        condition: service_started
+      application-service:
+        condition: service_started
+      admin-service:
+        condition: service_started
+      zipkin:
+        condition: service_started
 
 volumes:
   mysql_data:
@@ -302,3 +357,8 @@ volumes:
   sonarqube_data:
   sonarqube_logs:
   sonarqube_extensions:
+
+#docker compose up -d mysql rabbitmq redis zipkin config-server discovery-server; docker compose rm -sf auth-service job-service application-service admin-service notification-service api-gateway; docker compose up -d --force-recreate auth-service job-service application-service admin-service notification-service api-gateway
+#docker compose ps
+#Invoke-WebRequest "http://localhost:8761/eureka/apps" -UseBasicParsing
+#docker compose down --remove-orphans; docker compose up -d --build

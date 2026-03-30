@@ -35,4 +35,3 @@ public class RedisCacheConfig {
                 .serializeValuesWith(serializer));
     }
 }
-

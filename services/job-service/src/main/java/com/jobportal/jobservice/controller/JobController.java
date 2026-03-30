@@ -31,6 +31,7 @@ public class JobController {
         if (actualRole == null || actualRole.isBlank()) {
             return false;
         }
+
         String normalized = actualRole.trim();
         if (normalized.regionMatches(true, 0, "ROLE_", 0, 5)) {
             normalized = normalized.substring(5);

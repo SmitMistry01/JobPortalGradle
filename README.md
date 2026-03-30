@@ -749,3 +749,45 @@ Run module tests only:
 ```bash
 .\gradlew :services:auth-service:test :services:job-service:test :services:application-service:test :services:admin-service:test :services:notification-service:test
 ```
+
+## CI/CD with GitHub Actions
+
+Workflows added under `.github/workflows`:
+
+- `ci.yml`: runs on push/PR to `main` and `develop`; executes `clean test` and `build`
+- `sonar.yml`: runs Sonar analysis on push to `main`/`develop` (and manual trigger)
+- `docker-cd.yml`: builds and pushes all service images to GHCR on push to `main` and version tags
+
+### Required GitHub repository secrets
+
+- `SONAR_TOKEN`: SonarQube token (required for `sonar.yml`)
+- `SONAR_HOST_URL`: SonarQube server URL (for example: `http://localhost:9000` for self-hosted runner)
+
+### Container registry details
+
+`docker-cd.yml` pushes images to:
+
+- `ghcr.io/<github-owner>/jobsportal-config-server`
+- `ghcr.io/<github-owner>/jobsportal-discovery-server`
+- `ghcr.io/<github-owner>/jobsportal-api-gateway`
+- `ghcr.io/<github-owner>/jobsportal-auth-service`
+- `ghcr.io/<github-owner>/jobsportal-job-service`
+- `ghcr.io/<github-owner>/jobsportal-application-service`
+- `ghcr.io/<github-owner>/jobsportal-admin-service`
+- `ghcr.io/<github-owner>/jobsportal-notification-service`
+
+Tags include commit SHA, `latest` (default branch), and Git tag refs.
+
+### Trigger summary
+
+- Open/update PR -> `ci.yml` validates code quality and build health
+- Merge to `main` -> `ci.yml` + `sonar.yml` + `docker-cd.yml`
+- Push tag like `v1.0.0` -> `docker-cd.yml` publishes versioned images
+- Manual run -> `sonar.yml` and `docker-cd.yml` support `workflow_dispatch`
+
+### Notes
+
+- `docker-cd.yml` uses `infrastructure/Dockerfile.service` and builds each service via matrix `SERVICE_MODULE`
+- GHCR publish uses built-in `GITHUB_TOKEN` with `packages: write` permission
+- For private SonarQube reachable only from local machine, use a self-hosted GitHub runner on that machine
+

@@ -83,8 +83,7 @@ public class AuthService {
         this.jwtService = jwtService;
         this.cloudinaryProfileImageService = cloudinaryProfileImageService;
         this.mailSender = mailSender;
-        
-        // Log mail configuration status
+
         logMailConfiguration();
     }
 
