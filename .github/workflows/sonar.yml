@@ -38,6 +38,9 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run Sonar scan
-        if: ${{ secrets.SONAR_TOKEN != '' }}
-        run: ./gradlew --no-daemon sonar "-Dsonar.token=${{ secrets.SONAR_TOKEN }}"
-
+        run: |
+          if [ -z "${{ secrets.SONAR_TOKEN }}" ]; then
+            echo "SONAR_TOKEN is not set. Skipping Sonar scan."
+            exit 0
+          fi
+          ./gradlew --no-daemon sonar "-Dsonar.token=${{ secrets.SONAR_TOKEN }}"
