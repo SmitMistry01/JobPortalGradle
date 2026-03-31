@@ -249,6 +249,54 @@ Consumers:
 
 Implemented in: `auth-service`, `job-service`, `admin-service`, `notification-service`.
 
+---
+
+## 7) CQRS + Pagination (Job Service)
+
+Classes:
+- `JobCommandService`: write side (`createJob`) + cache eviction + RabbitMQ publish
+- `JobQueryService`: read side (`getAllJobs`, `getJob`, `search`, `searchPaged`) + Redis cache
+
+Controller endpoint added:
+- `GET /api/jobs/paged?page=0&size=10&title=java&location=pune`
+
+Why interviewer-friendly:
+- Clear read/write separation
+- Easy to scale read operations independently
+- Pagination prevents heavy full-table response payloads
+
+---
+
+## 8) Saga Optimization (Application Status)
+
+When recruiter updates application status to `SHORTLISTED` or `SELECTED`:
+
+1. Application row is updated in `applications` table.
+2. Saga row is created in `application_status_saga` with state `PENDING`.
+3. Event is published to RabbitMQ with `eventId` + `correlationId`.
+4. If publish succeeds -> saga state `COMPLETED`.
+5. If publish fails -> saga state `FAILED`, `retryCount` incremented, `lastError` stored.
+
+Consumer-side protection:
+- `notification-service` uses Redis `setIfAbsent` with `eventId` to avoid duplicate emails.
+
+---
+
+## 9) Config Server from Git Repo
+
+`config-server` supports both:
+- `native` profile (default, classpath config)
+- `git` profile (GitHub repo as config source)
+
+Environment variables for git mode:
+- `CONFIG_SERVER_PROFILE=git`
+- `CONFIG_GIT_URI=https://github.com/<org>/<repo>.git`
+- `CONFIG_GIT_DEFAULT_LABEL=main`
+- `CONFIG_GIT_USERNAME` / `CONFIG_GIT_PASSWORD` (if private repo)
+- `CONFIG_GIT_CLONE_ON_START=true`
+
+This lets you change credentials/configs in one Git repo without code rebuild.
+
 Where caching is used:
 - Auth:
   - cache user lists and emails (`authUsers`, `authUserEmails`)

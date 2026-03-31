@@ -5,6 +5,7 @@ import com.jobportal.notificationservice.event.JobPostedEvent;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 class NotificationListenerServiceTest {
 
@@ -12,11 +13,16 @@ class NotificationListenerServiceTest {
     void onJobPosted_shouldSendToAllUsers() {
         EmailSenderService emailSenderService = Mockito.mock(EmailSenderService.class);
         AuthUserEmailService authUserEmailService = Mockito.mock(AuthUserEmailService.class);
+        StringRedisTemplate stringRedisTemplate = Mockito.mock(StringRedisTemplate.class);
 
         Mockito.when(authUserEmailService.getAllUserEmails())
                 .thenReturn(List.of("u1@example.com", "u2@example.com"));
 
-        NotificationListenerService listener = new NotificationListenerService(emailSenderService, authUserEmailService);
+        NotificationListenerService listener = new NotificationListenerService(
+                emailSenderService,
+                authUserEmailService,
+                stringRedisTemplate
+        );
 
         JobPostedEvent event = new JobPostedEvent();
         event.setJobId(1L);
@@ -33,7 +39,12 @@ class NotificationListenerServiceTest {
     void onApplicationStatusChanged_shouldSendToCandidate() {
         EmailSenderService emailSenderService = Mockito.mock(EmailSenderService.class);
         AuthUserEmailService authUserEmailService = Mockito.mock(AuthUserEmailService.class);
-        NotificationListenerService listener = new NotificationListenerService(emailSenderService, authUserEmailService);
+        StringRedisTemplate stringRedisTemplate = Mockito.mock(StringRedisTemplate.class);
+        NotificationListenerService listener = new NotificationListenerService(
+                emailSenderService,
+                authUserEmailService,
+                stringRedisTemplate
+        );
 
         ApplicationStatusEvent event = new ApplicationStatusEvent();
         event.setApplicationId(10L);

@@ -2,10 +2,10 @@ spring:
   application:
     name: auth-service
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: jobportall121@gmail.com
-    password: tyrwqxhcmvwaxjjq
+    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
@@ -39,5 +39,5 @@ management:
       probability: 1.0
   zipkin:
     tracing:
-      endpoint: http://localhost:9411/api/v2/spans
+      endpoint: ${MANAGEMENT_ZIPKIN_TRACING_ENDPOINT:http://localhost:9411/api/v2/spans}
 

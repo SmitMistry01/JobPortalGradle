@@ -263,6 +263,54 @@ docker compose logs -f discovery-server
 - Gives stable hosted URLs for profile images and resumes
 - Keeps existing JSON APIs backward-compatible while enabling file uploads
 
+### 6) CQRS + Pagination + Saga (implemented)
+
+**CQRS in `job-service`**
+
+- Write path uses `JobCommandService` (`createJob` + cache eviction + event publish)
+- Read path uses `JobQueryService` (list/get/search + Redis caching)
+- New paginated endpoint: `GET /api/jobs/paged?page=0&size=10&title=java&location=pune`
+
+**Why**
+
+- Read/write responsibilities are separated for easier optimization
+- Pagination avoids loading large job lists in one response
+- Read-heavy traffic benefits from Redis cache without complicating write logic
+
+**Saga optimization in `application-service`**
+
+- `updateStatus` now creates a saga record (`application_status_saga`) with `PENDING`
+- On successful RabbitMQ publish, state becomes `COMPLETED`
+- On publish failure, state becomes `FAILED` with retry metadata for debugging/replay
+- Event includes `eventId` and `correlationId`
+
+**Idempotent consumer in `notification-service`**
+
+- Deduplicates status-notification events by `eventId` using Redis (`setIfAbsent` with TTL)
+- Prevents duplicate emails on retries/redeliveries
+
+### 7) Config Server from GitHub repo (implemented)
+
+`config-server` now supports Git-backed configuration via environment variables.
+
+Default remains `native` (local classpath config). Switch to Git with:
+
+```powershell
+$env:CONFIG_SERVER_PROFILE="git"
+$env:CONFIG_GIT_URI="https://github.com/<your-org>/<your-config-repo>.git"
+$env:CONFIG_GIT_DEFAULT_LABEL="main"
+$env:CONFIG_GIT_USERNAME="<optional-username>"
+$env:CONFIG_GIT_PASSWORD="<personal-access-token-or-password>"
+$env:CONFIG_GIT_CLONE_ON_START="true"
+```
+
+Then start `config-server` and verify:
+
+```powershell
+Invoke-WebRequest http://localhost:8888/actuator/health -UseBasicParsing
+Invoke-WebRequest http://localhost:8888/auth-service/default -UseBasicParsing
+```
+
 ### Cloudinary setup for local run
 
 Set these in your terminal before starting services (or set as system environment variables):

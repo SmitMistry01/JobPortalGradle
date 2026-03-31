@@ -2,8 +2,11 @@ package com.jobportal.jobservice.controller;
 
 import com.jobportal.jobservice.dto.CreateJobRequest;
 import com.jobportal.jobservice.model.Job;
-import com.jobportal.jobservice.service.JobService;
+import com.jobportal.jobservice.service.JobCommandService;
+import com.jobportal.jobservice.service.JobQueryService;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,10 +14,12 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/jobs")
 public class JobController {
 
-    private final JobService jobService;
+    private final JobCommandService jobCommandService;
+    private final JobQueryService jobQueryService;
 
-    public JobController(JobService jobService) {
-        this.jobService = jobService;
+    public JobController(JobCommandService jobCommandService, JobQueryService jobQueryService) {
+        this.jobCommandService = jobCommandService;
+        this.jobQueryService = jobQueryService;
     }
 
     @PostMapping
@@ -24,7 +29,7 @@ public class JobController {
         if (!hasRole(role, "RECRUITER")) {
             return ResponseEntity.status(403).build();
         }
-        return ResponseEntity.ok(jobService.createJob(request, userId));
+        return ResponseEntity.ok(jobCommandService.createJob(request, userId));
     }
 
     private boolean hasRole(String actualRole, String expectedRole) {
@@ -41,17 +46,26 @@ public class JobController {
 
     @GetMapping
     public ResponseEntity<List<Job>> allJobs() {
-        return ResponseEntity.ok(jobService.getAllJobs());
+        return ResponseEntity.ok(jobQueryService.getAllJobs());
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Job> getJob(@PathVariable Long id) {
-        return ResponseEntity.ok(jobService.getJob(id));
+        return ResponseEntity.ok(jobQueryService.getJob(id));
     }
 
     @GetMapping("/search")
     public ResponseEntity<List<Job>> search(@RequestParam(required = false) String title,
                                             @RequestParam(required = false) String location) {
-        return ResponseEntity.ok(jobService.search(title, location));
+        return ResponseEntity.ok(jobQueryService.search(title, location));
+    }
+
+    @GetMapping("/paged")
+    public ResponseEntity<Page<Job>> searchPaged(
+            @RequestParam(required = false) String title,
+            @RequestParam(required = false) String location,
+            Pageable pageable
+    ) {
+        return ResponseEntity.ok(jobQueryService.searchPaged(title, location, pageable));
     }
 }

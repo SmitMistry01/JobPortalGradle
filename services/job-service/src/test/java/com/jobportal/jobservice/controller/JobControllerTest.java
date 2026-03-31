@@ -3,7 +3,8 @@ package com.jobportal.jobservice.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jobportal.jobservice.dto.CreateJobRequest;
 import com.jobportal.jobservice.model.Job;
-import com.jobportal.jobservice.service.JobService;
+import com.jobportal.jobservice.service.JobCommandService;
+import com.jobportal.jobservice.service.JobQueryService;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -31,7 +34,10 @@ class JobControllerTest {
     private ObjectMapper objectMapper;
 
     @MockBean
-    private JobService jobService;
+    private JobCommandService jobCommandService;
+
+    @MockBean
+    private JobQueryService jobQueryService;
 
     @Test
     void createJob_shouldReturnForbidden_forNonRecruiter() throws Exception {
@@ -59,7 +65,7 @@ class JobControllerTest {
         job.setTitle("Java Developer");
         job.setRecruiterId(5L);
 
-        Mockito.when(jobService.createJob(Mockito.any(CreateJobRequest.class), Mockito.eq(5L))).thenReturn(job);
+        Mockito.when(jobCommandService.createJob(Mockito.any(CreateJobRequest.class), Mockito.eq(5L))).thenReturn(job);
 
         mockMvc.perform(post("/api/jobs")
                         .header("X-User-Role", "RECRUITER")
@@ -84,7 +90,7 @@ class JobControllerTest {
         job.setTitle("Java Developer");
         job.setRecruiterId(7L);
 
-        Mockito.when(jobService.createJob(Mockito.any(CreateJobRequest.class), Mockito.eq(7L))).thenReturn(job);
+        Mockito.when(jobCommandService.createJob(Mockito.any(CreateJobRequest.class), Mockito.eq(7L))).thenReturn(job);
 
         mockMvc.perform(post("/api/jobs")
                         .header("X-User-Role", "ROLE_RECRUITER")
@@ -101,10 +107,29 @@ class JobControllerTest {
         Job job = new Job();
         job.setId(2L);
         job.setTitle("Backend Engineer");
-        Mockito.when(jobService.getAllJobs()).thenReturn(List.of(job));
+        Mockito.when(jobQueryService.getAllJobs()).thenReturn(List.of(job));
 
         mockMvc.perform(get("/api/jobs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(2));
+    }
+
+    @Test
+    void pagedJobs_shouldReturnPageData() throws Exception {
+        Job job = new Job();
+        job.setId(9L);
+        job.setTitle("Platform Engineer");
+
+        Mockito.when(jobQueryService.searchPaged(Mockito.eq("Platform"), Mockito.eq("Pune"), Mockito.any()))
+                .thenReturn(new PageImpl<>(List.of(job), PageRequest.of(0, 5), 1));
+
+        mockMvc.perform(get("/api/jobs/paged")
+                        .param("title", "Platform")
+                        .param("location", "Pune")
+                        .param("page", "0")
+                        .param("size", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(9))
+                .andExpect(jsonPath("$.totalElements").value(1));
     }
 }

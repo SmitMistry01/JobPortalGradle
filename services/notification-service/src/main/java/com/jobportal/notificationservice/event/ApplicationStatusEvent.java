@@ -4,6 +4,8 @@ public class ApplicationStatusEvent {
     private Long applicationId;
     private String email;
     private String status;
+    private String eventId;
+    private String correlationId;
 
     public Long getApplicationId() {
         return applicationId;
@@ -27,5 +29,21 @@ public class ApplicationStatusEvent {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getEventId() {
+        return eventId;
+    }
+
+    public void setEventId(String eventId) {
+        this.eventId = eventId;
+    }
+
+    public String getCorrelationId() {
+        return correlationId;
+    }
+
+    public void setCorrelationId(String correlationId) {
+        this.correlationId = correlationId;
     }
 }

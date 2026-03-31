@@ -2,12 +2,17 @@ package com.jobportal.applicationservice.service;
 
 import com.jobportal.applicationservice.dto.ApplyJobRequest;
 import com.jobportal.applicationservice.event.ApplicationStatusEvent;
+import com.jobportal.applicationservice.model.ApplicationStatusSaga;
 import com.jobportal.applicationservice.model.ApplicationStatus;
 import com.jobportal.applicationservice.model.JobApplication;
+import com.jobportal.applicationservice.model.SagaState;
+import com.jobportal.applicationservice.repository.ApplicationStatusSagaRepository;
 import com.jobportal.applicationservice.repository.JobApplicationRepository;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -16,15 +21,18 @@ public class ApplicationDomainService {
     private final JobApplicationRepository repository;
     private final RabbitTemplate rabbitTemplate;
     private final CloudinaryResumeService cloudinaryResumeService;
+    private final ApplicationStatusSagaRepository sagaRepository;
 
     public ApplicationDomainService(
             JobApplicationRepository repository,
             RabbitTemplate rabbitTemplate,
-            CloudinaryResumeService cloudinaryResumeService
+            CloudinaryResumeService cloudinaryResumeService,
+            ApplicationStatusSagaRepository sagaRepository
     ) {
         this.repository = repository;
         this.rabbitTemplate = rabbitTemplate;
         this.cloudinaryResumeService = cloudinaryResumeService;
+        this.sagaRepository = sagaRepository;
     }
 
     public JobApplication applyWithResume(Long jobId, MultipartFile resume, Long userId, String userEmail) {
@@ -79,6 +87,7 @@ public class ApplicationDomainService {
         return repository.findByJobId(jobId);
     }
 
+    @Transactional
     public JobApplication updateStatus(Long id, ApplicationStatus status) {
         JobApplication application = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Application not found"));
@@ -87,11 +96,33 @@ public class ApplicationDomainService {
         JobApplication saved = repository.save(application);
 
         if (status == ApplicationStatus.SHORTLISTED || status == ApplicationStatus.SELECTED) {
-            rabbitTemplate.convertAndSend(
-                    "notification.exchange",
-                    "application.status.changed",
-                    new ApplicationStatusEvent(saved.getId(), saved.getUserEmail(), status.name())
-            );
+            String eventId = UUID.randomUUID().toString();
+            String correlationId = "application-status-" + saved.getId();
+
+            ApplicationStatusSaga saga = new ApplicationStatusSaga();
+            saga.setEventId(eventId);
+            saga.setCorrelationId(correlationId);
+            saga.setApplicationId(saved.getId());
+            saga.setState(SagaState.PENDING);
+            sagaRepository.save(saga);
+
+            try {
+                rabbitTemplate.convertAndSend(
+                        "notification.exchange",
+                        "application.status.changed",
+                        new ApplicationStatusEvent(saved.getId(), saved.getUserEmail(), status.name(), eventId, correlationId)
+                );
+                saga.setState(SagaState.COMPLETED);
+                saga.setLastError(null);
+            } catch (Exception ex) {
+                saga.setState(SagaState.FAILED);
+                saga.setRetryCount(saga.getRetryCount() + 1);
+                saga.setLastError(ex.getMessage());
+                sagaRepository.save(saga);
+                throw ex;
+            }
+
+            sagaRepository.save(saga);
         }
 
         return saved;

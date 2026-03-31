@@ -5,12 +5,18 @@ spring:
   application:
     name: config-server
   profiles:
-    active: native
+    active: ${CONFIG_SERVER_PROFILE:native}
   cloud:
     config:
       server:
         native:
           search-locations: classpath:/config
+        git:
+          uri: ${CONFIG_GIT_URI:https://github.com/SmitMistry01/JobPortalConfigFile}
+          default-label: ${CONFIG_GIT_DEFAULT_LABEL:main}
+          username: ${CONFIG_GIT_USERNAME:}
+          password: ${CONFIG_GIT_PASSWORD:}
+          clone-on-start: ${CONFIG_GIT_CLONE_ON_START:false}
 
 eureka:
   client:

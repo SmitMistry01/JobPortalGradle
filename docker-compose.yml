@@ -1,7 +1,4 @@
-version: '3.8'
-
 services:
-
   mysql:
     image: mysql:8.4
     container_name: mysql
@@ -12,6 +9,12 @@ services:
       - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./infrastructure/mysql-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-psmit"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -19,12 +22,84 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
   redis:
     image: redis:7-alpine
     container_name: redis
     ports:
       - "6379:6379"
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
+
+  loki:
+    image: grafana/loki:3.1.1
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./infrastructure/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+
+  promtail:
+    image: grafana/promtail:3.1.1
+    container_name: promtail
+    command: -config.file=/etc/promtail/promtail.yml
+    volumes:
+      - ./infrastructure/promtail/promtail-docker.yml:/etc/promtail/promtail.yml:ro
+      - ./logs:/host-logs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+
+  sonar-db:
+    image: postgres:16-alpine
+    container_name: sonar-db
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonar
+      POSTGRES_DB: sonarqube
+    volumes:
+      - sonarqube_db_data:/var/lib/postgresql/data
+
+  sonarqube:
+    image: sonarqube:lts-community
+    container_name: sonarqube
+    depends_on:
+      - sonar-db
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://sonar-db:5432/sonarqube
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: sonar
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube_extensions:/opt/sonarqube/extensions
 
   zipkin:
     image: openzipkin/zipkin:2.24
@@ -33,71 +108,257 @@ services:
       - "9411:9411"
 
   config-server:
-    image: crazy1smit/config-server:latest
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.service
+      args:
+        SERVICE_MODULE: config-server
+    container_name: config-server
     ports:
       - "8888:8888"
+    environment:
+      SERVER_PORT: 8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: config-server
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8888/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
 
   discovery-server:
-    image: crazy1smit/discovery-server:latest
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.service
+      args:
+        SERVICE_MODULE: discovery-server
+    container_name: discovery-server
     ports:
       - "8761:8761"
+    environment:
+      SERVER_PORT: 8761
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_REGISTER_WITH_EUREKA: "false"
+      EUREKA_CLIENT_FETCH_REGISTRY: "false"
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: discovery-server
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
     depends_on:
-      - config-server
+      config-server:
+        condition: service_healthy
 
   auth-service:
-    image: crazy1smit/auth-service:latest
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.service
+      args:
+        SERVICE_MODULE: auth-service
+    container_name: auth-service
     ports:
       - "8081:8081"
     environment:
+      SERVER_PORT: 8081
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: auth-service
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/auth_db
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: smit
+      SPRING_DATA_REDIS_HOST: redis
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
+      SECURITY_JWT_SECRET: my-super-secret-jwt-key-my-super-secret-jwt-key
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
     depends_on:
-      - mysql
-      - discovery-server
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   job-service:
-    image: crazy1smit/job-service:latest
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.service
+      args:
+        SERVICE_MODULE: job-service
+    container_name: job-service
     ports:
       - "8082:8082"
+    environment:
+      SERVER_PORT: 8082
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: job-service
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/job_db
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: smit
+      SPRING_DATA_REDIS_HOST: redis
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+      SPRING_RABBITMQ_HOST: rabbitmq
     depends_on:
-      - mysql
-      - rabbitmq
-      - discovery-server
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   application-service:
-    image: crazy1smit/application-service:latest
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.service
+      args:
+        SERVICE_MODULE: application-service
+    container_name: application-service
     ports:
       - "8083:8083"
+    environment:
+      SERVER_PORT: 8083
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: application-service
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/user_db
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: smit
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+      SPRING_RABBITMQ_HOST: rabbitmq
     depends_on:
-      - mysql
-      - discovery-server
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
   admin-service:
-    image: crazy1smit/admin-service:latest
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.service
+      args:
+        SERVICE_MODULE: admin-service
+    container_name: admin-service
     ports:
       - "8084:8084"
+    environment:
+      SERVER_PORT: 8084
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: admin-service
+      SPRING_DATA_REDIS_HOST: redis
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     depends_on:
-      - redis
-      - discovery-server
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   notification-service:
-    image: crazy1smit/notification-service:latest
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.service
+      args:
+        SERVICE_MODULE: notification-service
+    container_name: notification-service
     ports:
       - "8085:8085"
+    environment:
+      SERVER_PORT: 8085
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: notification-service
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_DATA_REDIS_HOST: redis
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+      SPRING_MAIL_HOST: smtp.gmail.com
+      SPRING_MAIL_PORT: 587
+      SPRING_MAIL_USERNAME: jobportall121@gmail.com
+      SPRING_MAIL_PASSWORD: tyrwqxhcmvwaxjjq
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
     depends_on:
-      - rabbitmq
-      - redis
-      - discovery-server
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   api-gateway:
-    image: crazy1smit/api-gateway:latest
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.service
+      args:
+        SERVICE_MODULE: api-gateway
+    container_name: api-gateway
     ports:
       - "8080:8080"
+    environment:
+      SERVER_PORT: 8080
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: api-gateway
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+      SECURITY_JWT_SECRET: my-super-secret-jwt-key-my-super-secret-jwt-key
     depends_on:
-      - auth-service
-      - job-service
-      - application-service
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      job-service:
+        condition: service_started
+      application-service:
+        condition: service_started
+      admin-service:
+        condition: service_started
+      zipkin:
+        condition: service_started
 
 volumes:
   mysql_data:
+  grafana_data:
+  loki_data:
+  sonarqube_db_data:
+  sonarqube_data:
+  sonarqube_logs:
+  sonarqube_extensions:
+
+#docker compose up -d mysql rabbitmq redis zipkin config-server discovery-server; docker compose rm -sf auth-service job-service application-service admin-service notification-service api-gateway; docker compose up -d --force-recreate auth-service job-service application-service admin-service notification-service api-gateway
+#docker compose ps
+#Invoke-WebRequest "http://localhost:8761/eureka/apps" -UseBasicParsing
+#docker compose down --remove-orphans; docker compose up -d --build
