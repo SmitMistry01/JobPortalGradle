@@ -6,6 +6,7 @@ import com.jobportal.authservice.dto.LoginRequest;
 import com.jobportal.authservice.dto.OtpMessageResponse;
 import com.jobportal.authservice.dto.RegisterRequest;
 import com.jobportal.authservice.dto.ResetPasswordRequest;
+import com.jobportal.authservice.dto.UpdateUserProfileRequest;
 import com.jobportal.authservice.dto.UserResponse;
 import com.jobportal.authservice.dto.VerifyForgotPasswordOtpRequest;
 import com.jobportal.authservice.dto.VerifyForgotPasswordOtpResponse;
@@ -118,6 +119,14 @@ public class AuthController {
             @RequestPart("profileImage") MultipartFile profileImage
     ) {
         return ResponseEntity.ok(authService.replaceProfileImage(userId, profileImage));
+    }
+
+    @PutMapping("/profile")
+    public ResponseEntity<UserResponse> updateProfile(
+            @RequestHeader("X-User-Id") Long userId,
+            @RequestBody UpdateUserProfileRequest request
+    ) {
+        return ResponseEntity.ok(authService.updateUserProfile(userId, request));
     }
 
     private Role resolveRole(String role) {

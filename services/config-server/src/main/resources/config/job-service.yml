@@ -11,13 +11,13 @@ spring:
       ddl-auto: update
     show-sql: true
   rabbitmq:
-    host: ${SPRING_RABBITMQ_HOST:localhost}
+    host: ${SPRING_RABBITMQ_HOST:rabbitmq}
     port: 5672
     username: guest
     password: guest
   data:
     redis:
-      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      host: ${SPRING_DATA_REDIS_HOST:redis}
       port: 6379
   cache:
     type: redis

@@ -4,25 +4,100 @@ server:
 spring:
   application:
     name: api-gateway
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:redis}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
   cloud:
+    loadbalancer:
+      retry:
+        enabled: true
     gateway:
       routes:
         - id: auth-service
           uri: lb://AUTH-SERVICE
           predicates:
             - Path=/api/auth/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: authServiceCircuit
+                fallbackUri: forward:/fallback/auth-service
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20
+                redis-rate-limiter.burstCapacity: 40
+                key-resolver: "#{@userKeyResolver}"
         - id: job-service
           uri: lb://JOB-SERVICE
           predicates:
             - Path=/api/jobs/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: jobServiceCircuit
+                fallbackUri: forward:/fallback/job-service
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 15
+                redis-rate-limiter.burstCapacity: 30
+                key-resolver: "#{@userKeyResolver}"
         - id: application-service
           uri: lb://APPLICATION-SERVICE
           predicates:
             - Path=/api/applications/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: applicationServiceCircuit
+                fallbackUri: forward:/fallback/application-service
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 12
+                redis-rate-limiter.burstCapacity: 24
+                key-resolver: "#{@userKeyResolver}"
         - id: admin-service
           uri: lb://ADMIN-SERVICE
           predicates:
             - Path=/api/admin/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: adminServiceCircuit
+                fallbackUri: forward:/fallback/admin-service
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                key-resolver: "#{@userKeyResolver}"
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      authServiceCircuit:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 20s
+      jobServiceCircuit:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 20s
+      applicationServiceCircuit:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 20s
+      adminServiceCircuit:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 20s
 
 eureka:
   client:

@@ -34,72 +34,72 @@ services:
     ports:
       - "6379:6379"
 
-  prometheus:
-    image: prom/prometheus:v2.54.1
-    container_name: prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-
-  grafana:
-    image: grafana/grafana:11.2.2
-    container_name: grafana
-    ports:
-      - "3000:3000"
-    environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
-
-  loki:
-    image: grafana/loki:3.1.1
-    container_name: loki
-    ports:
-      - "3100:3100"
-    command: -config.file=/etc/loki/loki-config.yml
-    volumes:
-      - ./infrastructure/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
-      - loki_data:/loki
-
-  promtail:
-    image: grafana/promtail:3.1.1
-    container_name: promtail
-    command: -config.file=/etc/promtail/promtail.yml
-    volumes:
-      - ./infrastructure/promtail/promtail-docker.yml:/etc/promtail/promtail.yml:ro
-      - ./logs:/host-logs:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    depends_on:
-      - loki
-
-  sonar-db:
-    image: postgres:16-alpine
-    container_name: sonar-db
-    environment:
-      POSTGRES_USER: sonar
-      POSTGRES_PASSWORD: sonar
-      POSTGRES_DB: sonarqube
-    volumes:
-      - sonarqube_db_data:/var/lib/postgresql/data
-
-  sonarqube:
-    image: sonarqube:lts-community
-    container_name: sonarqube
-    depends_on:
-      - sonar-db
-    environment:
-      SONAR_JDBC_URL: jdbc:postgresql://sonar-db:5432/sonarqube
-      SONAR_JDBC_USERNAME: sonar
-      SONAR_JDBC_PASSWORD: sonar
-    ports:
-      - "9000:9000"
-    volumes:
-      - sonarqube_data:/opt/sonarqube/data
-      - sonarqube_logs:/opt/sonarqube/logs
-      - sonarqube_extensions:/opt/sonarqube/extensions
+#  prometheus:
+#    image: prom/prometheus:v2.54.1
+#    container_name: prometheus
+#    ports:
+#      - "9090:9090"
+#    volumes:
+#      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+#
+#  grafana:
+#    image: grafana/grafana:11.2.2
+#    container_name: grafana
+#    ports:
+#      - "3000:3000"
+#    environment:
+#      GF_SECURITY_ADMIN_USER: admin
+#      GF_SECURITY_ADMIN_PASSWORD: admin
+#    volumes:
+#      - grafana_data:/var/lib/grafana
+#      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
+#
+#  loki:
+#    image: grafana/loki:3.1.1
+#    container_name: loki
+#    ports:
+#      - "3100:3100"
+#    command: -config.file=/etc/loki/loki-config.yml
+#    volumes:
+#      - ./infrastructure/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+#      - loki_data:/loki
+#
+#  promtail:
+#    image: grafana/promtail:3.1.1
+#    container_name: promtail
+#    command: -config.file=/etc/promtail/promtail.yml
+#    volumes:
+#      - ./infrastructure/promtail/promtail-docker.yml:/etc/promtail/promtail.yml:ro
+#      - ./logs:/host-logs:ro
+#      - /var/run/docker.sock:/var/run/docker.sock:ro
+#    depends_on:
+#      - loki
+#
+#  sonar-db:
+#    image: postgres:16-alpine
+#    container_name: sonar-db
+#    environment:
+#      POSTGRES_USER: sonar
+#      POSTGRES_PASSWORD: sonar
+#      POSTGRES_DB: sonarqube
+#    volumes:
+#      - sonarqube_db_data:/var/lib/postgresql/data
+#
+#  sonarqube:
+#    image: sonarqube:lts-community
+#    container_name: sonarqube
+#    depends_on:
+#      - sonar-db
+#    environment:
+#      SONAR_JDBC_URL: jdbc:postgresql://sonar-db:5432/sonarqube
+#      SONAR_JDBC_USERNAME: sonar
+#      SONAR_JDBC_PASSWORD: sonar
+#    ports:
+#      - "9000:9000"
+#    volumes:
+#      - sonarqube_data:/opt/sonarqube/data
+#      - sonarqube_logs:/opt/sonarqube/logs
+#      - sonarqube_extensions:/opt/sonarqube/extensions
 
   zipkin:
     image: openzipkin/zipkin:2.24
@@ -175,6 +175,12 @@ services:
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: smit
       SPRING_DATA_REDIS_HOST: redis
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-smtp.gmail.com}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
       MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
       SECURITY_JWT_SECRET: my-super-secret-jwt-key-my-super-secret-jwt-key
@@ -245,6 +251,9 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/user_db
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: smit
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
       SPRING_RABBITMQ_HOST: rabbitmq
     depends_on:
@@ -300,10 +309,10 @@ services:
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_DATA_REDIS_HOST: redis
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
-      SPRING_MAIL_HOST: smtp.gmail.com
-      SPRING_MAIL_PORT: 587
-      SPRING_MAIL_USERNAME: jobportall121@gmail.com
-      SPRING_MAIL_PASSWORD: tyrwqxhcmvwaxjjq
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-smtp.gmail.com}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD}
       SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
       SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
     depends_on:
@@ -351,12 +360,12 @@ services:
 
 volumes:
   mysql_data:
-  grafana_data:
-  loki_data:
-  sonarqube_db_data:
-  sonarqube_data:
-  sonarqube_logs:
-  sonarqube_extensions:
+#  grafana_data:
+#  loki_data:
+#  sonarqube_db_data:
+#  sonarqube_data:
+#  sonarqube_logs:
+#  sonarqube_extensions:
 
 #docker compose up -d mysql rabbitmq redis zipkin config-server discovery-server; docker compose rm -sf auth-service job-service application-service admin-service notification-service api-gateway; docker compose up -d --force-recreate auth-service job-service application-service admin-service notification-service api-gateway
 #docker compose ps

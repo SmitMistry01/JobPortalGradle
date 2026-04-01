@@ -6,6 +6,7 @@ import com.jobportal.authservice.dto.LoginRequest;
 import com.jobportal.authservice.dto.OtpMessageResponse;
 import com.jobportal.authservice.dto.RegisterRequest;
 import com.jobportal.authservice.dto.ResetPasswordRequest;
+import com.jobportal.authservice.dto.UpdateUserProfileRequest;
 import com.jobportal.authservice.dto.UserResponse;
 import com.jobportal.authservice.dto.VerifyForgotPasswordOtpRequest;
 import com.jobportal.authservice.dto.VerifyForgotPasswordOtpResponse;
@@ -383,6 +384,39 @@ public class AuthService {
 
         String token = jwtService.generateToken(user);
         return new AuthResponse(token, user.getId(), user.getEmail(), user.getRole().name());
+    }
+
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "authUsers", allEntries = true),
+            @CacheEvict(cacheNames = "authUserEmails", allEntries = true)
+    })
+    public UserResponse updateUserProfile(Long userId, UpdateUserProfileRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Request body is required");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (request.getName() != null && !request.getName().isBlank()) {
+            user.setName(request.getName().trim());
+        }
+        if (request.getUsername() != null && !request.getUsername().isBlank()) {
+            user.setUsername(request.getUsername().trim());
+        }
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone().isBlank() ? null : request.getPhone().trim());
+        }
+
+        User saved = userRepository.save(user);
+        return new UserResponse(
+                saved.getId(),
+                saved.getName(),
+                saved.getEmail(),
+                saved.getRole(),
+                saved.getPhone(),
+                saved.getProfileImageUrl()
+        );
     }
 
     @Cacheable(cacheNames = "authUsers")

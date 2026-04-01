@@ -7,6 +7,7 @@ import com.jobportal.authservice.dto.LoginRequest;
 import com.jobportal.authservice.dto.OtpMessageResponse;
 import com.jobportal.authservice.dto.RegisterRequest;
 import com.jobportal.authservice.dto.ResetPasswordRequest;
+import com.jobportal.authservice.dto.UpdateUserProfileRequest;
 import com.jobportal.authservice.dto.UserResponse;
 import com.jobportal.authservice.dto.VerifyForgotPasswordOtpRequest;
 import com.jobportal.authservice.dto.VerifyForgotPasswordOtpResponse;
@@ -26,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.jobportal.authservice.config.SecurityConfig;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -150,6 +152,45 @@ class AuthControllerTest {
     }
 
     @Test
+    void requestRegistrationOtpMultipart_shouldReturnMessage() throws Exception {
+        MockMultipartFile profileImage = new MockMultipartFile(
+                "profileImage",
+                "avatar.png",
+                "image/png",
+                "image-bytes".getBytes()
+        );
+
+        Mockito.when(authService.requestRegistrationOtp(Mockito.any(RegisterRequest.class), Mockito.any()))
+                .thenReturn(new OtpMessageResponse("OTP sent to your email"));
+
+        mockMvc.perform(multipart("/api/auth/register/request-otp")
+                        .file(profileImage)
+                        .param("name", "Recruiter One")
+                        .param("email", "recruiter@example.com")
+                        .param("password", "password123")
+                        .param("role", "RECRUITER")
+                        .param("phone", "9999999999")
+                        .contentType(MediaType.MULTIPART_FORM_DATA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("OTP sent to your email"));
+    }
+
+    @Test
+    void requestRegistrationOtpMultipart_withInvalidRole_shouldReturnBadRequest() throws Exception {
+        mockMvc.perform(multipart("/api/auth/register/request-otp")
+                        .param("name", "Recruiter One")
+                        .param("email", "recruiter@example.com")
+                        .param("password", "password123")
+                        .param("role", "invalid-role")
+                        .contentType(MediaType.MULTIPART_FORM_DATA))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message").value("Invalid role: invalid-role"));
+
+        Mockito.verify(authService, never()).requestRegistrationOtp(Mockito.any(RegisterRequest.class), Mockito.any());
+    }
+
+    @Test
     void verifyRegistrationOtp_shouldReturnUser() throws Exception {
         VerifyRegistrationOtpRequest request = new VerifyRegistrationOtpRequest();
         request.setEmail("user1@example.com");
@@ -211,5 +252,23 @@ class AuthControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Password reset successful"));
+    }
+
+    @Test
+    void updateProfile_shouldReturnUpdatedUser() throws Exception {
+        UpdateUserProfileRequest request = new UpdateUserProfileRequest();
+        request.setName("Updated User");
+        request.setPhone("8888888888");
+
+        Mockito.when(authService.updateUserProfile(Mockito.eq(1L), Mockito.any(UpdateUserProfileRequest.class)))
+                .thenReturn(new UserResponse(1L, "Updated User", "user1@example.com", Role.JOB_SEEKER, "8888888888"));
+
+        mockMvc.perform(put("/api/auth/profile")
+                        .header("X-User-Id", "1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Updated User"))
+                .andExpect(jsonPath("$.phone").value("8888888888"));
     }
 }
