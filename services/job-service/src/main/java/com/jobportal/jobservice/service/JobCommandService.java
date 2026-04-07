@@ -30,10 +30,12 @@ public class JobCommandService {
         Job job = new Job();
         job.setTitle(request.getTitle());
         job.setCompanyName(request.getCompanyName());
+        job.setJobType(request.getJobType());
         job.setLocation(request.getLocation());
         job.setSalary(request.getSalary());
         job.setExperience(request.getExperience());
         job.setDescription(request.getDescription());
+        job.setOpenings(request.getOpenings() == null || request.getOpenings() < 1 ? 1 : request.getOpenings());
         job.setPostedBy(recruiterId);
         job.setRecruiterId(recruiterId);
 
@@ -44,6 +46,47 @@ public class JobCommandService {
                 new JobPostedEvent(saved.getId(), saved.getTitle(), saved.getCompanyName())
         );
         return saved;
+    }
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "jobsAll", allEntries = true),
+            @CacheEvict(cacheNames = "jobsById", allEntries = true),
+            @CacheEvict(cacheNames = "jobsSearch", allEntries = true),
+            @CacheEvict(cacheNames = "jobsPaged", allEntries = true)
+    })
+    public Job updateJob(Long jobId, CreateJobRequest request, Long actorUserId, boolean adminOverride) {
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new IllegalArgumentException("Job not found"));
+
+        if (!adminOverride && !job.getRecruiterId().equals(actorUserId)) {
+            throw new IllegalArgumentException("You can update only your own job posting");
+        }
+
+        job.setTitle(request.getTitle());
+        job.setCompanyName(request.getCompanyName());
+        job.setJobType(request.getJobType());
+        job.setLocation(request.getLocation());
+        job.setSalary(request.getSalary());
+        job.setExperience(request.getExperience());
+        job.setDescription(request.getDescription());
+        job.setOpenings(request.getOpenings() == null || request.getOpenings() < 1 ? 1 : request.getOpenings());
+        return jobRepository.save(job);
+    }
+
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "jobsAll", allEntries = true),
+            @CacheEvict(cacheNames = "jobsById", allEntries = true),
+            @CacheEvict(cacheNames = "jobsSearch", allEntries = true),
+            @CacheEvict(cacheNames = "jobsPaged", allEntries = true)
+    })
+    public void deleteJob(Long jobId, Long actorUserId, boolean adminOverride) {
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new IllegalArgumentException("Job not found"));
+
+        if (!adminOverride && !job.getRecruiterId().equals(actorUserId)) {
+            throw new IllegalArgumentException("You can delete only your own job posting");
+        }
+
+        jobRepository.delete(job);
     }
 }
 

@@ -19,6 +19,7 @@ import com.jobportal.authservice.repository.PasswordResetOtpRepository;
 import com.jobportal.authservice.repository.RegistrationOtpRepository;
 import com.jobportal.authservice.repository.UserRepository;
 import com.jobportal.authservice.security.JwtService;
+import jakarta.annotation.PostConstruct;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -84,7 +85,11 @@ public class AuthService {
         this.jwtService = jwtService;
         this.cloudinaryProfileImageService = cloudinaryProfileImageService;
         this.mailSender = mailSender;
+    }
 
+    @PostConstruct
+    void logResolvedMailConfiguration() {
+        // Log after property injection to avoid constructor-time null/empty values.
         logMailConfiguration();
     }
 
@@ -95,17 +100,13 @@ public class AuthService {
         log.info("SMTP Password: {}", mailPassword != null && !mailPassword.isEmpty() ? "***SET***" : "NOT SET");
         
         if (mailUsername == null || mailUsername.isEmpty()) {
-            log.warn("⚠️  MAIL_USERNAME environment variable is NOT set!");
-            log.warn("⚠️  Email sending will FAIL!");
-            log.warn("⚠️  Set: export MAIL_USERNAME=jobportall121@gmail.com");
+            log.info("SPRING_MAIL_USERNAME is not set.");
         }
         if (mailPassword == null || mailPassword.isEmpty()) {
-            log.warn("⚠️  MAIL_PASSWORD environment variable is NOT set!");
-            log.warn("⚠️  Email sending will FAIL!");
-            log.warn("⚠️  Set: export MAIL_PASSWORD=tyrwqxhcmvwaxjjq");
+            log.info("SPRING_MAIL_PASSWORD is not set.");
         }
         if (mailHost == null || mailHost.isEmpty()) {
-            log.warn("⚠️  SMTP Host is not configured!");
+            log.info("SMTP Host is not configured.");
         }
         log.info("========================================");
     }
@@ -141,14 +142,14 @@ public class AuthService {
         registrationOtp.setUsername(resolveUsername(request));
         registrationOtp.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         registrationOtp.setPhone(request.getPhone());
-        registrationOtp.setRole(request.getRole() == null ? Role.JOB_SEEKER : request.getRole());
+        registrationOtp.setRole(resolveRegistrationRole(request.getRole()));
         registrationOtp.setProfileImageUrl(request.getProfileImageUrl());
         registrationOtp.setOtpHash(passwordEncoder.encode(otp));
         registrationOtp.setExpiresAt(LocalDateTime.now().plusMinutes(otpExpiryMinutes));
         registrationOtp.setAttempts(0);
         registrationOtpRepository.save(registrationOtp);
 
-        log.info("🔐 REGISTRATION OTP: {} (Expires in {} minutes)", otp, otpExpiryMinutes);
+        log.info("Registration OTP generated (expires in {} minutes)", otpExpiryMinutes);
         log.info("📧 OTP Email: {}", normalizedEmail);
         
         sendOtpEmail(normalizedEmail, otp, "Registration OTP", "Use this OTP to complete your registration");
@@ -232,7 +233,7 @@ public class AuthService {
         passwordResetOtp.setResetTokenExpiresAt(null);
         passwordResetOtpRepository.save(passwordResetOtp);
 
-        log.info("🔐 PASSWORD RESET OTP: {} (Expires in {} minutes)", otp, otpExpiryMinutes);
+        log.info("Password reset OTP generated (expires in {} minutes)", otpExpiryMinutes);
         log.info("📧 OTP Email: {}", normalizedEmail);
         
         sendOtpEmail(normalizedEmail, otp, "Password reset OTP", "Use this OTP to verify your password reset request");
@@ -360,7 +361,7 @@ public class AuthService {
         user.setUsername(resolveUsername(request));
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setPhone(request.getPhone());
-        user.setRole(request.getRole() == null ? Role.JOB_SEEKER : request.getRole());
+        user.setRole(resolveRegistrationRole(request.getRole()));
         user.setProfileImageUrl(request.getProfileImageUrl());
 
         User saved = userRepository.save(user);
@@ -463,16 +464,13 @@ public class AuthService {
     }
 
     private void sendOtpEmail(String to, String otp, String subject, String contextLine) {
+        if (mailHost == null || mailHost.isEmpty()
+                || mailUsername == null || mailUsername.isEmpty()
+                || mailPassword == null || mailPassword.isEmpty()) {
+            throw new IllegalStateException("SMTP is not configured. Set SPRING_MAIL_HOST, SPRING_MAIL_USERNAME and SPRING_MAIL_PASSWORD");
+        }
+
         try {
-            if (mailUsername == null || mailUsername.isEmpty() || mailPassword == null || mailPassword.isEmpty()) {
-                log.warn("⚠️  Email configuration incomplete!");
-                log.warn("  MAIL_USERNAME: {}", mailUsername != null && !mailUsername.isEmpty() ? "SET" : "NOT SET");
-                log.warn("  MAIL_PASSWORD: {}", mailPassword != null && !mailPassword.isEmpty() ? "SET" : "NOT SET");
-                log.warn("  Skipping email send to: {}", to);
-                log.warn("  OTP (for testing): {}", otp);
-                return; // Don't crash, just skip email
-            }
-            
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(to);
             message.setSubject(subject);
@@ -486,11 +484,8 @@ public class AuthService {
             log.info("✅ OTP email sent successfully to: {}", to);
         } catch (Exception e) {
             log.error("❌ Failed to send OTP email to {}: {}", to, e.getMessage());
-            log.error("Mail configuration - Username: {}, Password set: {}", 
-                mailUsername != null && !mailUsername.isEmpty() ? "SET" : "NOT SET",
-                mailPassword != null && !mailPassword.isEmpty() ? "YES" : "NO");
             log.debug("Email error details:", e);
-            // Continue without failing - OTP is still stored in DB for verification
+            throw new IllegalStateException("OTP email delivery failed", e);
         }
     }
 
@@ -509,5 +504,15 @@ public class AuthService {
         }
 
         request.setEmail(normalizeEmail(request.getEmail()));
+    }
+
+    private Role resolveRegistrationRole(Role requestedRole) {
+        if (requestedRole == null) {
+            return Role.JOB_SEEKER;
+        }
+        if (requestedRole == Role.ADMIN) {
+            throw new IllegalArgumentException("Admin registration is not allowed");
+        }
+        return requestedRole;
     }
 }

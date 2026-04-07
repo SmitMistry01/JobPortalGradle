@@ -59,14 +59,36 @@ public class ApplicationController {
         return ResponseEntity.ok(service.jobApplications(jobId));
     }
 
+    @GetMapping("/internal/job/{jobId}")
+    public ResponseEntity<List<JobApplication>> internalJobApplications(@PathVariable Long jobId) {
+        return ResponseEntity.ok(service.jobApplications(jobId));
+    }
+
     @PutMapping("/{id}/status")
     public ResponseEntity<JobApplication> updateStatus(@PathVariable Long id,
                                                        @RequestParam ApplicationStatus status,
                                                        @RequestHeader("X-User-Role") String role) {
-        if (!hasRole(role, "RECRUITER")) {
+        if (!hasAnyRole(role, "RECRUITER", "ADMIN")) {
             return ResponseEntity.status(403).build();
         }
         return ResponseEntity.ok(service.updateStatus(id, status));
+    }
+
+    @PutMapping("/internal/{id}/status")
+    public ResponseEntity<JobApplication> internalUpdateStatus(@PathVariable Long id,
+                                                               @RequestParam ApplicationStatus status) {
+        return ResponseEntity.ok(service.updateStatus(id, status));
+    }
+
+    @PutMapping("/job/{jobId}/user/{userId}/status")
+    public ResponseEntity<JobApplication> updateStatusByUserAndJob(@PathVariable Long jobId,
+                                                                    @PathVariable Long userId,
+                                                                    @RequestParam ApplicationStatus status,
+                                                                    @RequestHeader("X-User-Role") String role) {
+        if (!hasAnyRole(role, "RECRUITER", "ADMIN")) {
+            return ResponseEntity.status(403).build();
+        }
+        return ResponseEntity.ok(service.updateStatusByUserAndJob(userId, jobId, status));
     }
 
     @PutMapping(value = "/{id}/resume", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

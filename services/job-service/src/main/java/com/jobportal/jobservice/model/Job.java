@@ -17,6 +17,9 @@ public class Job {
     @Column(name = "company_name")
     private String companyName;
 
+    @Column(name = "job_type")
+    private String jobType;
+
     private String location;
 
     private BigDecimal salary;
@@ -32,6 +35,9 @@ public class Job {
     @Column(name = "recruiter_id")
     private Long recruiterId;
 
+    @Column(name = "openings")
+    private Integer openings;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -39,11 +45,17 @@ public class Job {
     public void prePersist() {
         this.createdAt = LocalDateTime.now();
         syncRecruiterFields();
+        if (this.openings == null || this.openings < 1) {
+            this.openings = 1;
+        }
     }
 
     @PreUpdate
     public void preUpdate() {
         syncRecruiterFields();
+        if (this.openings == null || this.openings < 1) {
+            this.openings = 1;
+        }
     }
 
     private void syncRecruiterFields() {
@@ -61,6 +73,8 @@ public class Job {
     public void setTitle(String title) { this.title = title; }
     public String getCompanyName() { return companyName; }
     public void setCompanyName(String companyName) { this.companyName = companyName; }
+    public String getJobType() { return jobType; }
+    public void setJobType(String jobType) { this.jobType = jobType; }
     public String getLocation() { return location; }
     public void setLocation(String location) { this.location = location; }
     public BigDecimal getSalary() { return salary; }
@@ -83,5 +97,7 @@ public class Job {
             this.postedBy = recruiterId;
         }
     }
+    public Integer getOpenings() { return openings; }
+    public void setOpenings(Integer openings) { this.openings = openings; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 }

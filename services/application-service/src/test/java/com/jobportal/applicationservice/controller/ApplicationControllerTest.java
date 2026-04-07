@@ -132,6 +132,32 @@ class ApplicationControllerTest {
     }
 
     @Test
+    void updateStatusByUserAndJob_shouldUpdate_forRecruiter() throws Exception {
+        JobApplication updated = new JobApplication();
+        updated.setId(15L);
+        updated.setUserId(2L);
+        updated.setJobId(1L);
+        updated.setStatus(ApplicationStatus.SHORTLISTED);
+
+        Mockito.when(service.updateStatusByUserAndJob(2L, 1L, ApplicationStatus.SHORTLISTED)).thenReturn(updated);
+
+        mockMvc.perform(put("/api/applications/job/1/user/2/status")
+                        .header("X-User-Role", "RECRUITER")
+                        .param("status", "SHORTLISTED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(15))
+                .andExpect(jsonPath("$.status").value("SHORTLISTED"));
+    }
+
+    @Test
+    void updateStatusByUserAndJob_shouldReturnForbidden_forNonRecruiter() throws Exception {
+        mockMvc.perform(put("/api/applications/job/1/user/2/status")
+                        .header("X-User-Role", "JOB_SEEKER")
+                        .param("status", "SHORTLISTED"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void applyMultipart_shouldCreateApplication_forJobSeeker() throws Exception {
         MockMultipartFile resume = new MockMultipartFile(
                 "resume",

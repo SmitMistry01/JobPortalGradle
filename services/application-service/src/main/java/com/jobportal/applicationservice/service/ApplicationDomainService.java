@@ -92,6 +92,19 @@ public class ApplicationDomainService {
         JobApplication application = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Application not found"));
 
+        return updateStatusAndPublishIfNeeded(application, status);
+    }
+
+    @Transactional
+    public JobApplication updateStatusByUserAndJob(Long userId, Long jobId, ApplicationStatus status) {
+        JobApplication application = repository.findByUserIdAndJobId(userId, jobId)
+                .orElseThrow(() -> new IllegalArgumentException("Application not found"));
+
+        return updateStatusAndPublishIfNeeded(application, status);
+    }
+
+    private JobApplication updateStatusAndPublishIfNeeded(JobApplication application, ApplicationStatus status) {
+
         application.setStatus(status);
         JobApplication saved = repository.save(application);
 

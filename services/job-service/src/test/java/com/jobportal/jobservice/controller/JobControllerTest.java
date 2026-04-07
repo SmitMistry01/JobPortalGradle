@@ -120,7 +120,16 @@ class JobControllerTest {
         job.setId(9L);
         job.setTitle("Platform Engineer");
 
-        Mockito.when(jobQueryService.searchPaged(Mockito.eq("Platform"), Mockito.eq("Pune"), Mockito.any()))
+        Mockito.when(jobQueryService.searchPaged(
+                        Mockito.eq("Platform"),
+                        Mockito.eq("Pune"),
+                        Mockito.isNull(),
+                        Mockito.isNull(),
+                        Mockito.isNull(),
+                        Mockito.isNull(),
+                        Mockito.isNull(),
+                        Mockito.isNull(),
+                        Mockito.any()))
                 .thenReturn(new PageImpl<>(List.of(job), PageRequest.of(0, 5), 1));
 
         mockMvc.perform(get("/api/jobs/paged")

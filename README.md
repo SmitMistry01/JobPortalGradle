@@ -676,6 +676,7 @@ Notes:
 - `GET /api/applications/user`
 - `GET /api/applications/job/{jobId}` (Recruiter/Admin)
 - `PUT /api/applications/{id}/status?status=SHORTLISTED|REJECTED|UNDER_REVIEW|SELECTED`
+- `PUT /api/applications/job/{jobId}/user/{userId}/status?status=SHORTLISTED|REJECTED|UNDER_REVIEW|SELECTED` (Recruiter only, preferred)
 
 ### Admin Service
 
