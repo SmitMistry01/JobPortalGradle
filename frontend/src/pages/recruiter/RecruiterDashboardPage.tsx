@@ -104,8 +104,6 @@ export function RecruiterDashboardPage() {
   const selectedOpenings = selectedJob?.openings ?? 1
   const remainingSlots = Math.max(0, selectedOpenings - selectedLikeCount)
 
-  // Aggregate stats
-  const totalApplicants = jobs.reduce((sum) => sum + 0, 0) // placeholder; real count needs per-job query
   const shortlistedCount = applications.filter((a) => a.status === 'SHORTLISTED').length
   const hiredCount = applications.filter((a) => a.status === 'HIRED' || a.status === 'SELECTED').length
 

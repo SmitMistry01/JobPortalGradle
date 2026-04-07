@@ -745,8 +745,7 @@ Notes:
 ## Important Notes
 
 - Gmail SMTP is configured using:
-	- `jobportall121@gmail.com`
-	- app password: `tyrwqxhcmvwaxjjq`
+	
 - `auth-service` MySQL DB in config is `auth_db`.
 - If your existing `users` table has a non-null `username` column, registration now supports `username` in payload and auto-generates it from email when omitted.
 - If you change config files in `config-server`, restart all services in order so they reload updated config.
@@ -839,4 +838,3 @@ Tags include commit SHA, `latest` (default branch), and Git tag refs.
 - `docker-cd.yml` uses `infrastructure/Dockerfile.service` and builds each service via matrix `SERVICE_MODULE`
 - GHCR publish uses built-in `GITHUB_TOKEN` with `packages: write` permission
 - For private SonarQube reachable only from local machine, use a self-hosted GitHub runner on that machine
-
