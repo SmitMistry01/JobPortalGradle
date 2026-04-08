@@ -1,7 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 import type { RootState } from '../app/store'
 
-const DEFAULT_API_BASE_URL = 'http://43.204.241.70:8080/api'
+const DEFAULT_API_BASE_URL = 'https://nexusapi.duckdns.org/api'
 
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim()
 const API_BASE_URL = configuredApiBaseUrl && configuredApiBaseUrl.length > 0
