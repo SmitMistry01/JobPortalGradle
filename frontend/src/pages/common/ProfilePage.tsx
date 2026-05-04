@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { FetchBaseQueryError } from '@reduxjs/toolkit/query'
 import { useAppSelector } from '../../app/hooks'
-import { useGetInternalUsersQuery, useUpdateProfileMutation } from '../../features/auth/authApi'
+import { useGetInternalUsersQuery, useUpdateProfileMutation, useUploadResumeMutation } from '../../features/auth/authApi'
 import { profileUpdateSchema } from '../../validation/authSchemas'
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -16,6 +16,7 @@ export function ProfilePage() {
   const authUser = useAppSelector((state) => state.auth.user)
   const { data: users = [], isLoading, error } = useGetInternalUsersQuery()
   const [updateProfile, { isLoading: isSaving }] = useUpdateProfileMutation()
+  const [uploadResume] = useUploadResumeMutation()
 
   const profile = useMemo(() => {
     if (!authUser) return null
@@ -44,6 +45,20 @@ export function ProfilePage() {
       setFeedback('Profile updated successfully.')
     } catch (saveError) {
       setErrorMessage(getErrorMessage(saveError, 'Could not update profile. Please try again.'))
+    }
+  }
+
+  async function handleResumeUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      setFeedback('Uploading resume and extracting skills using AI... Please wait.')
+      const formData = new FormData()
+      formData.append('resume', file)
+      await uploadResume(formData).unwrap()
+      setFeedback('Resume uploaded and skills extracted successfully!')
+    } catch (err) {
+      setErrorMessage(getErrorMessage(err, 'Failed to upload resume'))
     }
   }
 
@@ -193,6 +208,48 @@ export function ProfilePage() {
             </form>
           </div>
         </div>
+
+        {/* Resume Section (Job Seekers Only) */}
+        {role === 'JOB_SEEKER' && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="mb-3 text-sm font-bold text-slate-700 dark:text-slate-300">Resume & Skills (AI Extracted)</h2>
+            
+            {profile?.resumeUrl ? (
+              <div className="mb-4">
+                <a href={profile.resumeUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400">
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  View Current Resume
+                </a>
+              </div>
+            ) : (
+              <p className="mb-4 text-sm text-slate-500">No resume uploaded yet.</p>
+            )}
+
+            {profile?.skills && profile.skills.length > 0 && (
+              <div className="mb-5">
+                <p className="mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Extracted Skills</p>
+                <div className="flex flex-wrap gap-2">
+                  {profile.skills.map((skill, i) => (
+                    <span key={i} className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-700/10 dark:bg-indigo-400/10 dark:text-indigo-400 dark:ring-indigo-400/30">
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-2">
+              <label className="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300">Upload New Resume (PDF)</label>
+              <input
+                type="file"
+                accept="application/pdf"
+                className="block w-full text-sm text-slate-500 file:mr-4 file:rounded-full file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 dark:text-slate-400 dark:file:bg-indigo-900/30 dark:file:text-indigo-400"
+                onChange={handleResumeUpload}
+              />
+              <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">Uploading a new resume will automatically extract your latest skills using AI.</p>
+            </div>
+          </div>
+        )}
 
         {/* Account Activity */}
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">

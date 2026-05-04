@@ -22,17 +22,23 @@ public class ApplicationDomainService {
     private final RabbitTemplate rabbitTemplate;
     private final CloudinaryResumeService cloudinaryResumeService;
     private final ApplicationStatusSagaRepository sagaRepository;
+    private final com.jobportal.applicationservice.client.AiServiceClient aiServiceClient;
+    private final com.jobportal.applicationservice.client.JobServiceClient jobServiceClient;
 
     public ApplicationDomainService(
             JobApplicationRepository repository,
             RabbitTemplate rabbitTemplate,
             CloudinaryResumeService cloudinaryResumeService,
-            ApplicationStatusSagaRepository sagaRepository
+            ApplicationStatusSagaRepository sagaRepository,
+            com.jobportal.applicationservice.client.AiServiceClient aiServiceClient,
+            com.jobportal.applicationservice.client.JobServiceClient jobServiceClient
     ) {
         this.repository = repository;
         this.rabbitTemplate = rabbitTemplate;
         this.cloudinaryResumeService = cloudinaryResumeService;
         this.sagaRepository = sagaRepository;
+        this.aiServiceClient = aiServiceClient;
+        this.jobServiceClient = jobServiceClient;
     }
 
     public JobApplication applyWithResume(Long jobId, MultipartFile resume, Long userId, String userEmail) {
@@ -76,6 +82,24 @@ public class ApplicationDomainService {
         application.setResumeUrl(request.getResumeUrl());
         application.setUserEmail(userEmail);
         application.setStatus(ApplicationStatus.APPLIED);
+        
+        try {
+            String jobDescription = jobServiceClient.getJobDescription(request.getJobId());
+            if (!jobDescription.isBlank()) {
+                java.util.Map<String, Object> atsResult = aiServiceClient.calculateAtsScore(request.getResumeUrl(), jobDescription);
+                if (atsResult.containsKey("score")) {
+                    application.setAtsScore((Integer) atsResult.get("score"));
+                }
+                if (atsResult.containsKey("feedback")) {
+                    application.setAtsFeedback((String) atsResult.get("feedback"));
+                }
+            }
+        } catch (Exception e) {
+            // Log error but allow application to proceed
+            application.setAtsScore(0);
+            application.setAtsFeedback("Could not calculate score: " + e.getMessage());
+        }
+        
         return repository.save(application);
     }
 

@@ -56,6 +56,13 @@ export const jobsApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ['Auth'],
     }),
+    getRecommendedJobs: builder.query<Job[], string[]>({
+      query: (skills) => ({
+        url: '/jobs/recommended',
+        params: { skills: skills.join(',') },
+      }),
+      providesTags: ['Auth'],
+    }),
   }),
 })
 
@@ -66,6 +73,7 @@ export const {
   useCreateJobMutation,
   useUpdateJobMutation,
   useDeleteJobMutation,
+  useGetRecommendedJobsQuery,
 } = jobsApi
 
 

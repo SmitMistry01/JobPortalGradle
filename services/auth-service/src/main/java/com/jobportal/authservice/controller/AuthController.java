@@ -38,7 +38,8 @@ public class AuthController {
 
     @PostMapping("/register/request-otp")
     public ResponseEntity<OtpMessageResponse> requestRegistrationOtp(@RequestBody RegisterRequest request) {
-        return ResponseEntity.ok(authService.requestRegistrationOtp(request));
+        // JSON flow has no uploaded file, so pass null for MultipartFile.
+        return ResponseEntity.ok(authService.requestRegistrationOtp(request, null));
     }
 
     @PostMapping("/register/verify-otp")
@@ -127,6 +128,14 @@ public class AuthController {
             @RequestBody UpdateUserProfileRequest request
     ) {
         return ResponseEntity.ok(authService.updateUserProfile(userId, request));
+    }
+
+    @PostMapping(value = "/profile/resume", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<UserResponse> uploadResume(
+            @RequestHeader("X-User-Id") Long userId,
+            @RequestPart("resume") MultipartFile resume
+    ) {
+        return ResponseEntity.ok(authService.uploadResume(userId, resume));
     }
 
     private Role resolveRole(String role) {

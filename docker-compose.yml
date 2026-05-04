@@ -330,6 +330,31 @@ services:
       redis:
         condition: service_started
 
+  ai-service:
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.service
+      args:
+        SERVICE_MODULE: ai-service
+    container_name: ai-service
+    ports:
+      - "8086:8086"
+    environment:
+      SERVER_PORT: 8086
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
+      EUREKA_CLIENT_SERVICE_URL_DEFAULT_ZONE: http://discovery-server:8761/eureka
+      EUREKA_INSTANCE_HOSTNAME: ai-service
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      zipkin:
+        condition: service_started
+
   api-gateway:
     build:
       context: .

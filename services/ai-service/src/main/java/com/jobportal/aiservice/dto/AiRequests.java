@@ -1,0 +1,3 @@
+package com.jobportal.aiservice.dto;
+
+// ...existing code...

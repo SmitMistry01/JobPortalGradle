@@ -26,6 +26,12 @@ public class JobApplication {
     @Column(name = "user_email")
     private String userEmail;
 
+    @Column(name = "ats_score")
+    private Integer atsScore;
+
+    @Column(name = "ats_feedback", columnDefinition = "TEXT")
+    private String atsFeedback;
+
     @Column(name = "applied_at")
     private LocalDateTime appliedAt;
 
@@ -50,4 +56,8 @@ public class JobApplication {
     public LocalDateTime getAppliedAt() { return appliedAt; }
     public String getUserEmail() { return userEmail; }
     public void setUserEmail(String userEmail) { this.userEmail = userEmail; }
+    public Integer getAtsScore() { return atsScore; }
+    public void setAtsScore(Integer atsScore) { this.atsScore = atsScore; }
+    public String getAtsFeedback() { return atsFeedback; }
+    public void setAtsFeedback(String atsFeedback) { this.atsFeedback = atsFeedback; }
 }

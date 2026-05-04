@@ -28,6 +28,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.beans.factory.annotation.Value;
@@ -48,8 +49,12 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final CloudinaryProfileImageService cloudinaryProfileImageService;
+    private final CloudinaryResumeService cloudinaryResumeService;
+    private final com.jobportal.authservice.client.AiServiceClient aiServiceClient;
     private final JavaMailSender mailSender;
+
     private final SecureRandom secureRandom = new SecureRandom();
+
 
     @Value("${auth.otp.expiry-minutes:10}")
     private long otpExpiryMinutes;
@@ -76,6 +81,8 @@ public class AuthService {
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
             CloudinaryProfileImageService cloudinaryProfileImageService,
+            CloudinaryResumeService cloudinaryResumeService,
+            com.jobportal.authservice.client.AiServiceClient aiServiceClient,
             JavaMailSender mailSender
     ) {
         this.userRepository = userRepository;
@@ -84,6 +91,8 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.cloudinaryProfileImageService = cloudinaryProfileImageService;
+        this.cloudinaryResumeService = cloudinaryResumeService;
+        this.aiServiceClient = aiServiceClient;
         this.mailSender = mailSender;
     }
 
@@ -117,11 +126,12 @@ public class AuthService {
         }
         return email.substring(0, 3) + "****" + email.substring(email.lastIndexOf('@'));
     }
-
-    public OtpMessageResponse requestRegistrationOtp(RegisterRequest request) {
-        return requestRegistrationOtp(request, null);
-    }
-
+//spring AOP intercepts the call and checks the cache
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "authUsers", allEntries = true),
+            @CacheEvict(cacheNames = "authUserEmails", allEntries = true)
+    })
+    @CachePut(cacheNames = "authUsers", key = "#result.id")
     public OtpMessageResponse requestRegistrationOtp(RegisterRequest request, MultipartFile profileImage) {
         validateRegisterRequest(request);
 
@@ -150,7 +160,7 @@ public class AuthService {
         registrationOtpRepository.save(registrationOtp);
 
         log.info("Registration OTP generated (expires in {} minutes)", otpExpiryMinutes);
-        log.info("📧 OTP Email: {}", normalizedEmail);
+        log.info("OTP Email: {}", normalizedEmail);
         
         sendOtpEmail(normalizedEmail, otp, "Registration OTP", "Use this OTP to complete your registration");
         return new OtpMessageResponse("OTP sent to your email");
@@ -172,14 +182,7 @@ public class AuthService {
         RegistrationOtp registrationOtp = registrationOtpRepository.findByEmail(normalizedEmail)
                 .orElseThrow(() -> new IllegalArgumentException("OTP is invalid or expired"));
 
-        if (registrationOtp.getExpiresAt().isBefore(LocalDateTime.now())) {
-            registrationOtpRepository.delete(registrationOtp);
-            throw new IllegalArgumentException("OTP has expired");
-        }
-        if (registrationOtp.getAttempts() >= maxOtpAttempts) {
-            registrationOtpRepository.delete(registrationOtp);
-            throw new IllegalArgumentException("OTP attempt limit exceeded. Please request a new OTP");
-        }
+
         if (!passwordEncoder.matches(request.getOtp().trim(), registrationOtp.getOtpHash())) {
             registrationOtp.setAttempts(registrationOtp.getAttempts() + 1);
             registrationOtpRepository.save(registrationOtp);
@@ -241,14 +244,12 @@ public class AuthService {
     }
 
     public VerifyForgotPasswordOtpResponse verifyForgotPasswordOtp(VerifyForgotPasswordOtpRequest request) {
-        if (request == null || request.getEmail() == null || request.getEmail().isBlank()) {
-            throw new IllegalArgumentException("Email is required");
-        }
+
         if (request.getOtp() == null || request.getOtp().isBlank()) {
             throw new IllegalArgumentException("OTP is required");
-        }
+        }       
 
-        String normalizedEmail = normalizeEmail(request.getEmail());
+       String normalizedEmail = normalizeEmail(request.getEmail());
         PasswordResetOtp passwordResetOtp = passwordResetOtpRepository.findByEmail(normalizedEmail)
                 .orElseThrow(() -> new IllegalArgumentException("OTP is invalid or expired"));
 
@@ -313,10 +314,9 @@ public class AuthService {
     }
 
     public UserResponse registerWithProfileImage(RegisterRequest request, MultipartFile profileImage) {
-        if (profileImage != null && !profileImage.isEmpty()) {
-            request.setProfileImageUrl(cloudinaryProfileImageService.uploadProfileImage(profileImage));
-        }
-        return register(request);
+        throw new UnsupportedOperationException(
+                "Direct registration is disabled. Use requestRegistrationOtp + verifyRegistrationOtp flow."
+        );
     }
 
     public UserResponse replaceProfileImage(Long userId, MultipartFile profileImage) {
@@ -344,37 +344,6 @@ public class AuthService {
         );
     }
 
-    @Caching(evict = {
-            @CacheEvict(cacheNames = "authUsers", allEntries = true),
-            @CacheEvict(cacheNames = "authUserEmails", allEntries = true)
-    })
-    public UserResponse register(RegisterRequest request) {
-        validateRegisterRequest(request);
-
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("Email already exists");
-        }
-
-        User user = new User();
-        user.setName(request.getName());
-        user.setEmail(request.getEmail());
-        user.setUsername(resolveUsername(request));
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setPhone(request.getPhone());
-        user.setRole(resolveRegistrationRole(request.getRole()));
-        user.setProfileImageUrl(request.getProfileImageUrl());
-
-        User saved = userRepository.save(user);
-        return new UserResponse(
-                saved.getId(),
-                saved.getName(),
-                saved.getEmail(),
-                saved.getRole(),
-                saved.getPhone(),
-                saved.getProfileImageUrl()
-        );
-    }
-
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
@@ -387,10 +356,12 @@ public class AuthService {
         return new AuthResponse(token, user.getId(), user.getEmail(), user.getRole().name());
     }
 
+//remove the data from the cache if deleted from actual data
     @Caching(evict = {
             @CacheEvict(cacheNames = "authUsers", allEntries = true),
             @CacheEvict(cacheNames = "authUserEmails", allEntries = true)
     })
+    @CachePut(cacheNames = "authUsers", key = "#result.id")
     public UserResponse updateUserProfile(Long userId, UpdateUserProfileRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("Request body is required");
@@ -416,10 +387,45 @@ public class AuthService {
                 saved.getEmail(),
                 saved.getRole(),
                 saved.getPhone(),
-                saved.getProfileImageUrl()
+                saved.getProfileImageUrl(),
+                saved.getResumeUrl(),
+                saved.getSkills()
         );
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = "authUsers", allEntries = true),
+            @CacheEvict(cacheNames = "authUserEmails", allEntries = true)
+    })
+    @CachePut(cacheNames = "authUsers", key = "#userId")
+    public UserResponse uploadResume(Long userId, MultipartFile resume) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        String resumeUrl = cloudinaryResumeService.uploadResume(resume);
+        user.setResumeUrl(resumeUrl);
+
+        try {
+            List<String> extractedSkills = aiServiceClient.extractSkills(resumeUrl);
+            user.setSkills(extractedSkills);
+        } catch (Exception e) {
+            log.error("Failed to extract skills from resume: {}", e.getMessage());
+            // Optionally, we could set skills to empty list, or leave existing
+        }
+
+        User saved = userRepository.save(user);
+        return new UserResponse(
+                saved.getId(),
+                saved.getName(),
+                saved.getEmail(),
+                saved.getRole(),
+                saved.getPhone(),
+                saved.getProfileImageUrl(),
+                saved.getResumeUrl(),
+                saved.getSkills()
+        );
+    }
+//response from the method needs to be cached using cacheable
     @Cacheable(cacheNames = "authUsers")
     public List<UserResponse> getAllUsers() {
         return userRepository.findAll().stream()
@@ -516,3 +522,4 @@ public class AuthService {
         return requestedRole;
     }
 }
+

@@ -479,10 +479,11 @@ export function RecruiterDashboardPage() {
           {applications.length > 0 && (
             <>
               {/* Table Header */}
-              <div className="hidden grid-cols-[1fr_auto_auto_auto] gap-4 border-b border-slate-100 px-6 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:border-slate-800 dark:text-slate-500 sm:grid">
+              <div className="hidden grid-cols-[1fr_auto_auto_auto_auto] gap-4 border-b border-slate-100 px-6 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:border-slate-800 dark:text-slate-500 sm:grid">
                 <span>Candidate</span>
                 <span className="text-center">Resume</span>
                 <span className="text-center">Applied</span>
+                <span className="text-center">ATS Score</span>
                 <span className="text-center">Status</span>
               </div>
 
@@ -518,6 +519,29 @@ export function RecruiterDashboardPage() {
                       {/* Applied date */}
                       <div className="text-xs text-slate-500 dark:text-slate-400 sm:text-center">
                         {new Date(application.appliedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </div>
+
+                      {/* ATS Score */}
+                      <div className="flex flex-col items-center justify-center sm:text-center">
+                        {application.atsScore !== undefined && application.atsScore !== null ? (
+                          <div className="group relative flex items-center gap-1.5">
+                            <span className={`inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                              application.atsScore >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                              application.atsScore >= 50 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                              'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                            }`}>
+                              {application.atsScore}%
+                            </span>
+                            {application.atsFeedback && (
+                              <div className="absolute bottom-full left-1/2 mb-2 hidden w-48 -translate-x-1/2 rounded-lg bg-slate-800 p-2 text-xs text-white shadow-xl group-hover:block dark:bg-slate-700 z-10">
+                                {application.atsFeedback}
+                                <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-slate-800 dark:border-t-slate-700" />
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400">N/A</span>
+                        )}
                       </div>
 
                       {/* Status dropdown */}

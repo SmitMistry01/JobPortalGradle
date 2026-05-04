@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent, type ReactElement } from 'react'
 import type { FetchBaseQueryError } from '@reduxjs/toolkit/query'
 import { useApplyWithResumeMutation, useLazyGetMyApplicationsQuery } from '../../features/applications/applicationsApi'
-import { useGetJobsQuery } from '../../features/jobs/jobsApi'
+import { useGetJobsQuery, useGetRecommendedJobsQuery } from '../../features/jobs/jobsApi'
 import type { JobSearchFilters, JobType } from '../../types/job'
 import { applyResumeSchema } from '../../validation/jobSchemas'
 
@@ -62,10 +62,30 @@ function avatarColor(name: string) {
   return colors[name.charCodeAt(0) % colors.length]
 }
 
+import { useAppSelector } from '../../app/hooks'
+import { useGetInternalUsersQuery } from '../../features/auth/authApi'
+
 export function JobsPage() {
+  const authUser = useAppSelector((state) => state.auth.user)
+  const { data: users = [] } = useGetInternalUsersQuery()
+  const profile = useMemo(() => {
+    if (!authUser) return null
+    return users.find((user) => user.id === authUser.userId) ?? null
+  }, [authUser, users])
+
+  const userSkills = profile?.skills ?? []
+
   const [filters, setFilters] = useState<JobSearchFilters>({})
   const [draftFilters, setDraftFilters] = useState<JobSearchFilters>({})
-  const { data: jobs = [], isLoading, isFetching, error } = useGetJobsQuery(filters)
+  const [showRecommended, setShowRecommended] = useState(false)
+  
+  const { data: searchJobs = [], isLoading: isSearchLoading, isFetching: isSearchFetching, error: searchError } = useGetJobsQuery(filters, { skip: showRecommended })
+  const { data: recommendedJobs = [], isLoading: isRecLoading, isFetching: isRecFetching, error: recError } = useGetRecommendedJobsQuery(userSkills, { skip: !showRecommended || userSkills.length === 0 })
+
+  const jobs = showRecommended ? recommendedJobs : searchJobs
+  const isLoading = showRecommended ? isRecLoading : isSearchLoading
+  const isFetching = showRecommended ? isRecFetching : isSearchFetching
+  const error = showRecommended ? recError : searchError
 
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
   const [resumeFile, setResumeFile] = useState<File | null>(null)
@@ -126,11 +146,24 @@ export function JobsPage() {
     <div className="mx-auto w-full max-w-screen-xl px-6 py-8">
     <div className="min-h-screen">
       {/* Page Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Find Jobs</h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          {isLoading ? 'Searching...' : `${jobs.length} job${jobs.length !== 1 ? 's' : ''} found — filter to narrow results`}
-        </p>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Find Jobs</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            {isLoading ? 'Searching...' : `${jobs.length} job${jobs.length !== 1 ? 's' : ''} found — filter to narrow results`}
+          </p>
+        </div>
+        {userSkills.length > 0 && (
+          <div className="mt-4 sm:mt-0 flex items-center gap-3 bg-white p-2 border border-slate-200 shadow-sm rounded-xl dark:bg-slate-900 dark:border-slate-800">
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Recommended for you</span>
+            <button
+              onClick={() => setShowRecommended(!showRecommended)}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 dark:focus:ring-offset-slate-900 ${showRecommended ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-700'}`}
+            >
+              <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${showRecommended ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Feedback */}

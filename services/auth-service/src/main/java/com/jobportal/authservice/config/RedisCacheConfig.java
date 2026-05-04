@@ -14,10 +14,10 @@ import org.springframework.data.redis.serializer.RedisSerializationContext;
 
 @Configuration
 public class RedisCacheConfig {
-
+//redis stores in binary data/strings not in object as it not understands classes
     @Value("${spring.cache.redis.time-to-live:120000}")
     private long cacheTtlMs;
-
+//Cache expires after this time
     @Bean
     public RedisCacheManagerBuilderCustomizer redisCacheManagerBuilderCustomizer() {
         ObjectMapper objectMapper = new ObjectMapper();

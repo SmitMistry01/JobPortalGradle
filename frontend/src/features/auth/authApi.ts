@@ -44,6 +44,10 @@ export const authApi = baseApi.injectEndpoints({
       query: (body) => ({ url: '/auth/profile', method: 'PUT', body }),
       invalidatesTags: ['Auth'],
     }),
+    uploadResume: builder.mutation<UserProfile, FormData>({
+      query: (body) => ({ url: '/auth/profile/resume', method: 'POST', body }),
+      invalidatesTags: ['Auth'],
+    }),
   }),
 })
 
@@ -57,5 +61,6 @@ export const {
   useResetPasswordMutation,
   useGetInternalUsersQuery,
   useUpdateProfileMutation,
+  useUploadResumeMutation,
 } = authApi
 

@@ -68,6 +68,8 @@ export interface UserProfile {
   role: Role
   phone?: string
   profileImageUrl?: string
+  resumeUrl?: string
+  skills?: string[]
 }
 
 export interface UpdateProfileRequest {

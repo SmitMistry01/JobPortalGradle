@@ -7,6 +7,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+
+//Producer(send msg)
 @Service
 public class AuthUserEmailService {
 
@@ -18,6 +20,8 @@ public class AuthUserEmailService {
 
     @Cacheable(cacheNames = "notificationUserEmails")
     public List<String> getAllUserEmails() {
+
+        //class used to make HTTP requests to external APIs or microservices
         return restTemplate.exchange(
                 "http://AUTH-SERVICE/api/auth/internal/users/emails",
                 HttpMethod.GET,

@@ -1,0 +1,21 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: ai-service
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans
+
+gemini:
+  api:
+    key: ${GEMINI_API_KEY:AIzaSyCVfjzkgbmN0XxUyEycLGbUE1HQ5YxPV-0}
+    url: https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent

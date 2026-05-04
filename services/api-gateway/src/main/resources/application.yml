@@ -3,6 +3,21 @@ spring:
     name: api-gateway
   config:
     import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
+  cloud:
+    gateway:
+      routes:
+        - id: auth-service-local-fallback
+          uri: lb://AUTH-SERVICE
+          predicates:
+            - Path=/api/auth/**
+        - id: ai-service-local-fallback
+          uri: http://localhost:8088
+          predicates:
+            - Path=/api/ai/**
+
+security:
+  jwt:
+    secret: ${SECURITY_JWT_SECRET:my-super-secret-jwt-key-my-super-secret-jwt-key}
 
 management:
   tracing:

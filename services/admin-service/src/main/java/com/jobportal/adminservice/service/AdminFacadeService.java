@@ -220,7 +220,7 @@ public class AdminFacadeService {
             try {
                 return java.time.Instant.parse(String.valueOf(value)).toEpochMilli();
             } catch (Exception ignored) {
-                // Ignore malformed date value and continue to fallback fields.
+
             }
         }
         return 0L;

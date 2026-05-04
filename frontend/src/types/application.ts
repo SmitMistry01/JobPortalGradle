@@ -8,4 +8,6 @@ export interface JobApplication {
   status: ApplicationStatus
   userEmail: string
   appliedAt: string
+  atsScore?: number
+  atsFeedback?: string
 }

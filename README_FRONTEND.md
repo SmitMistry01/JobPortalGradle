@@ -1,8 +1,8 @@
 # Frontend Implementation Guide (React + TypeScript)
 
-This frontend lives in `frontend/` and is built for your deployed backend gateway:
+This frontend lives in `frontend/` and is built for local development against your backend gateway on localhost:
 
-- Base API: `http://<EC2-IP>:8080/api`
+- Base API: `http://localhost:8080/api` or the proxied relative path `/api`
 - Env key: `VITE_API_BASE_URL`
 
 ## 1) Implemented Scope (Phase 1)
@@ -120,10 +120,10 @@ cd frontend
 cp .env.example .env
 ```
 
-2. Set API gateway URL in `.env`:
+2. Set API gateway URL in `.env` for local development:
 
 ```dotenv
-VITE_API_BASE_URL=http://<EC2-IP>:8080/api
+VITE_API_BASE_URL=/api
 ```
 
 3. Install and run:

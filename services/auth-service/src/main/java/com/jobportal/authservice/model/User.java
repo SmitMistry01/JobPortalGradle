@@ -30,6 +30,14 @@ public class User {
     @Column(name = "profile_image_url")
     private String profileImageUrl;
 
+    @Column(name = "resume_url")
+    private String resumeUrl;
+
+    @ElementCollection
+    @CollectionTable(name = "user_skills", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "skill")
+    private java.util.List<String> skills;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -104,5 +112,21 @@ public class User {
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public String getResumeUrl() {
+        return resumeUrl;
+    }
+
+    public void setResumeUrl(String resumeUrl) {
+        this.resumeUrl = resumeUrl;
+    }
+
+    public java.util.List<String> getSkills() {
+        return skills;
+    }
+
+    public void setSkills(java.util.List<String> skills) {
+        this.skills = skills;
     }
 }

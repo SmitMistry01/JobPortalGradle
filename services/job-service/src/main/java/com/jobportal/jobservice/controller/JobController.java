@@ -144,6 +144,25 @@ public class JobController {
         return ResponseEntity.ok(jobQueryService.getJobsByRecruiter(recruiterId));
     }
 
+    @GetMapping("/recommended")
+    public ResponseEntity<List<Job>> recommendedJobs(@RequestParam(required = false) List<String> skills) {
+        List<Job> allJobs = jobQueryService.getAllJobs();
+        if (skills == null || skills.isEmpty()) {
+            return ResponseEntity.ok(allJobs);
+        }
+        
+        List<Job> recommended = allJobs.stream()
+                .filter(job -> {
+                    String desc = job.getDescription() != null ? job.getDescription().toLowerCase() : "";
+                    String title = job.getTitle() != null ? job.getTitle().toLowerCase() : "";
+                    return skills.stream().anyMatch(skill -> 
+                            desc.contains(skill.toLowerCase()) || title.contains(skill.toLowerCase()));
+                })
+                .toList();
+                
+        return ResponseEntity.ok(recommended.isEmpty() ? allJobs : recommended);
+    }
+
     private boolean hasAnyRole(String actualRole, String... expectedRoles) {
         for (String expectedRole : expectedRoles) {
             if (hasRole(actualRole, expectedRole)) {

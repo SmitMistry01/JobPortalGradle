@@ -7,6 +7,8 @@ import org.springframework.amqp.core.Queue;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+//Define of binding(link btw exchange and queue)
+//Producer → Exchange → Queue → Consumer
 @Configuration
 public class RabbitTopologyConfig {
 

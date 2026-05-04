@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom'
 import { Header } from './Header'
 import { Footer } from './Footer'
+import { ChatWidget } from '../ChatWidget'
 
 export function AppShell() {
   return (
@@ -10,7 +11,7 @@ export function AppShell() {
         <Outlet />
       </main>
       <Footer />
+      <ChatWidget />
     </div>
   )
 }
-

@@ -10,5 +10,6 @@ include(
     'services:notification-service',
     'services:discovery-server',
     'services:config-server',
-    'services:api-gateway'
+    'services:api-gateway',
+    'services:ai-service'
 )

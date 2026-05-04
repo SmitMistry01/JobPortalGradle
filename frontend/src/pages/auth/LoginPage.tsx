@@ -13,15 +13,34 @@ export function LoginPage() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
 
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
+    setSubmitError(null)
     const validation = loginSchema.safeParse({ email, password })
     if (!validation.success) return
-    const result = await login(validation.data).unwrap()
-    dispatch(setCredentials(result))
-    if (result.role === 'ADMIN') navigate('/admin')
-    else if (result.role === 'RECRUITER') navigate('/recruiter')
-    else navigate('/jobs')
+
+    try {
+      const result = await login(validation.data).unwrap()
+      dispatch(setCredentials(result))
+      if (result.role === 'ADMIN') navigate('/admin')
+      else if (result.role === 'RECRUITER') navigate('/recruiter')
+      else navigate('/jobs')
+    } catch (err: any) {
+      // Prevent uncaught promise rejections and surface a friendly message.
+      // RTK Query errors often have shape: { status, error, data }
+      console.error('Login failed', err)
+      if (err?.name === 'AbortError' || (err?.error && String(err.error).includes('AbortError')) || String(err?.message ?? '').toLowerCase().includes('aborted')) {
+        setSubmitError('Request aborted or timed out. Please check your network and try again.')
+      } else if (err?.status === 'FETCH_ERROR') {
+        setSubmitError('Network error while contacting the API. Check the server URL or CORS settings.')
+      } else if (err?.data?.message) {
+        setSubmitError(String(err.data.message))
+      } else {
+        setSubmitError('Login failed. Please check your credentials and try again.')
+      }
+    }
   }
 
   return (
@@ -159,6 +178,13 @@ export function LoginPage() {
               <div className="flex items-center gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
                 <svg className="h-4 w-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
                 Invalid email or password. Please try again.
+              </div>
+            )}
+
+            {submitError && (
+              <div className="flex items-center gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+                <svg className="h-4 w-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                {submitError}
               </div>
             )}
 
