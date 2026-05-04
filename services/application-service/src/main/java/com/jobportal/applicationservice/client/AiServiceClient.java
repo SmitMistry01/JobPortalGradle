@@ -14,7 +14,9 @@ import java.util.Map;
 public class AiServiceClient {
 
     private final RestTemplate restTemplate;
-    private static final String AI_SERVICE_URL = "http://localhost:8080/api/ai/ats-score";
+
+    @org.springframework.beans.factory.annotation.Value("${ai.service.ats-score-url:http://localhost:8086/api/ai/ats-score}")
+    private String aiServiceUrl;
 
     public AiServiceClient(RestTemplateBuilder restTemplateBuilder) {
         this.restTemplate = restTemplateBuilder.build();
@@ -31,7 +33,7 @@ public class AiServiceClient {
 
             HttpEntity<Map<String, String>> request = new HttpEntity<>(requestBody, headers);
 
-            return restTemplate.postForObject(AI_SERVICE_URL, request, Map.class);
+            return restTemplate.postForObject(aiServiceUrl, request, Map.class);
         } catch (Exception e) {
             e.printStackTrace();
             return Map.of("score", 0, "feedback", "Failed to calculate ATS score");

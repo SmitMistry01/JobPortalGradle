@@ -15,8 +15,9 @@ import java.util.Map;
 public class AiServiceClient {
 
     private final RestTemplate restTemplate;
-    // Assuming API Gateway is on localhost:8080
-    private static final String AI_SERVICE_URL = "http://localhost:8080/api/ai/extract-skills";
+
+    @org.springframework.beans.factory.annotation.Value("${ai.service.extract-skills-url:http://localhost:8086/api/ai/extract-skills}")
+    private String aiServiceUrl;
 
     public AiServiceClient(RestTemplateBuilder restTemplateBuilder) {
         this.restTemplate = restTemplateBuilder.build();
@@ -32,7 +33,7 @@ public class AiServiceClient {
 
             HttpEntity<Map<String, String>> request = new HttpEntity<>(requestBody, headers);
 
-            Map response = restTemplate.postForObject(AI_SERVICE_URL, request, Map.class);
+            Map response = restTemplate.postForObject(aiServiceUrl, request, Map.class);
             if (response != null && response.containsKey("skills")) {
                 return (List<String>) response.get("skills");
             }

@@ -16,6 +16,10 @@ interface ReplaceResumeRequest {
   resume: File
 }
 
+interface RecalculateAtsRequest {
+  applicationId: number
+}
+
 export const applicationsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     applyWithResume: builder.mutation<JobApplication, ApplyWithResumeRequest>({
@@ -60,6 +64,13 @@ export const applicationsApi = baseApi.injectEndpoints({
       },
       invalidatesTags: ['Auth'],
     }),
+    recalculateAtsScore: builder.mutation<JobApplication, RecalculateAtsRequest>({
+      query: ({ applicationId }) => ({
+        url: `/applications/${applicationId}/ats-score`,
+        method: 'PUT',
+      }),
+      invalidatesTags: ['Auth'],
+    }),
   }),
 })
 
@@ -70,5 +81,6 @@ export const {
   useGetApplicationsByJobQuery,
   useUpdateApplicationStatusMutation,
   useReplaceResumeMutation,
+  useRecalculateAtsScoreMutation,
 } = applicationsApi
 

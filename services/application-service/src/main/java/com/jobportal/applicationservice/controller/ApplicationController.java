@@ -104,6 +104,15 @@ public class ApplicationController {
         return ResponseEntity.ok(service.replaceResume(id, resume, userId));
     }
 
+    @PutMapping("/{id}/ats-score")
+    public ResponseEntity<JobApplication> recalculateAtsScore(@PathVariable Long id,
+                                                              @RequestHeader("X-User-Role") String role) {
+        if (!hasAnyRole(role, "RECRUITER", "ADMIN")) {
+            return ResponseEntity.status(403).build();
+        }
+        return ResponseEntity.ok(service.recalculateAtsScore(id));
+    }
+
     private boolean hasAnyRole(String actualRole, String... expectedRoles) {
         for (String expectedRole : expectedRoles) {
             if (hasRole(actualRole, expectedRole)) {

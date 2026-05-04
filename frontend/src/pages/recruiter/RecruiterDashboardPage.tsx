@@ -3,6 +3,7 @@ import { useAppSelector } from '../../app/hooks'
 import {
   useGetApplicationsByJobQuery,
   useUpdateApplicationStatusMutation,
+  useRecalculateAtsScoreMutation,
 } from '../../features/applications/applicationsApi'
 import {
   useCreateJobMutation,
@@ -77,11 +78,13 @@ export function RecruiterDashboardPage() {
   const [createError, setCreateError] = useState<string | null>(null)
   const [selectionError, setSelectionError] = useState<string | null>(null)
   const [showPostForm, setShowPostForm] = useState(false)
+  const [atsLoadingId, setAtsLoadingId] = useState<number | null>(null)
 
   const [createJob, { isLoading: isCreating }] = useCreateJobMutation()
   const [updateJob, { isLoading: isUpdatingJob }] = useUpdateJobMutation()
   const [deleteJob, { isLoading: isDeletingJob }] = useDeleteJobMutation()
   const [updateStatus, { isLoading: isUpdating }] = useUpdateApplicationStatusMutation()
+  const [recalculateAtsScore] = useRecalculateAtsScoreMutation()
 
   const {
     data: applications = [],
@@ -195,6 +198,17 @@ export function RecruiterDashboardPage() {
       await updateStatus({ applicationId, status }).unwrap()
     } catch {
       // no-op
+    }
+  }
+
+  async function handleRecalculateAts(applicationId: number) {
+    try {
+      setAtsLoadingId(applicationId)
+      await recalculateAtsScore({ applicationId }).unwrap()
+    } catch {
+      // no-op
+    } finally {
+      setAtsLoadingId((current) => (current === applicationId ? null : current))
     }
   }
 
@@ -522,7 +536,7 @@ export function RecruiterDashboardPage() {
                       </div>
 
                       {/* ATS Score */}
-                      <div className="flex flex-col items-center justify-center sm:text-center">
+                      <div className="flex flex-col items-center justify-center gap-2 sm:text-center">
                         {application.atsScore !== undefined && application.atsScore !== null ? (
                           <div className="group relative flex items-center gap-1.5">
                             <span className={`inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-bold ${
@@ -542,6 +556,14 @@ export function RecruiterDashboardPage() {
                         ) : (
                           <span className="text-xs text-slate-400">N/A</span>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => handleRecalculateAts(application.id)}
+                          disabled={atsLoadingId === application.id}
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-indigo-300 hover:text-indigo-700 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-indigo-600 dark:hover:text-indigo-400"
+                        >
+                          {atsLoadingId === application.id ? 'Calculating...' : (application.atsScore ? 'Refresh ATS' : 'Calculate ATS')}
+                        </button>
                       </div>
 
                       {/* Status dropdown */}

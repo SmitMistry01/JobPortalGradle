@@ -19,7 +19,9 @@ public class SecurityConfig {
                 .requestMatchers(
                         "/api/auth/login",
                         "/api/auth/register/**",
-                        "/api/auth/password/forgot/**"
+                        "/api/auth/password/forgot/**",
+                        "/api/auth/internal/**",
+                        "/api/auth/profile/**"
                 ).permitAll()
                 .anyRequest().authenticated()) //for authenticated users
                 .httpBasic(Customizer.withDefaults());

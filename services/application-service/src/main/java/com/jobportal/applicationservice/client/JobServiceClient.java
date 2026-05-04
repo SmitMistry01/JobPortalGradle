@@ -10,8 +10,9 @@ import java.util.Map;
 public class JobServiceClient {
 
     private final RestTemplate restTemplate;
-    // Assuming API Gateway is on localhost:8080
-    private static final String JOB_SERVICE_URL = "http://localhost:8080/api/jobs/";
+
+    @org.springframework.beans.factory.annotation.Value("${job.service.url:http://job-service:8082/api/jobs/}")
+    private String jobServiceUrl;
 
     public JobServiceClient(RestTemplateBuilder restTemplateBuilder) {
         this.restTemplate = restTemplateBuilder.build();
@@ -19,7 +20,7 @@ public class JobServiceClient {
 
     public String getJobDescription(Long jobId) {
         try {
-            Map response = restTemplate.getForObject(JOB_SERVICE_URL + jobId, Map.class);
+            Map response = restTemplate.getForObject(jobServiceUrl + jobId, Map.class);
             if (response != null && response.containsKey("description")) {
                 return (String) response.get("description");
             }

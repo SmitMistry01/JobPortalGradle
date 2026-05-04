@@ -435,7 +435,9 @@ public class AuthService {
                         u.getEmail(),
                         u.getRole(),
                         u.getPhone(),
-                        u.getProfileImageUrl()
+                        u.getProfileImageUrl(),
+                        u.getResumeUrl(),
+                        u.getSkills()
                 ))
                 .toList();
     }

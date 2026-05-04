@@ -71,3 +71,7 @@ management:
 logging:
   file:
     name: logs/auth-service.log
+
+ai:
+  service:
+    extract-skills-url: http://ai-service:8086/api/ai/extract-skills

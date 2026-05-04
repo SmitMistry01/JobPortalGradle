@@ -164,4 +164,30 @@ public class ApplicationDomainService {
 
         return saved;
     }
+
+    public JobApplication recalculateAtsScore(Long applicationId) {
+        JobApplication application = repository.findById(applicationId)
+                .orElseThrow(() -> new IllegalArgumentException("Application not found"));
+
+        try {
+            String jobDescription = jobServiceClient.getJobDescription(application.getJobId());
+            if (jobDescription != null && !jobDescription.isBlank()) {
+                java.util.Map<String, Object> atsResult = aiServiceClient.calculateAtsScore(application.getResumeUrl(), jobDescription);
+                if (atsResult.containsKey("score")) {
+                    application.setAtsScore((Integer) atsResult.get("score"));
+                }
+                if (atsResult.containsKey("feedback")) {
+                    application.setAtsFeedback((String) atsResult.get("feedback"));
+                }
+            } else {
+                application.setAtsScore(0);
+                application.setAtsFeedback("Job description unavailable for scoring");
+            }
+        } catch (Exception e) {
+            application.setAtsScore(0);
+            application.setAtsFeedback("Could not calculate score: " + e.getMessage());
+        }
+
+        return repository.save(application);
+    }
 }
